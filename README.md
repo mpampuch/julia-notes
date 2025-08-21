@@ -5035,6 +5035,9 @@ end
 
 ---
 
+
+---
+
 ## Sets in Julia
 
 Sets are unordered collections of unique elements that provide fast membership testing and set operations. They're perfect for tracking unique values and performing mathematical set operations.
@@ -7321,7 +7324,9 @@ end  # ~2.0 ms
 
 ---
 
-## R vs Julia Vectorization Performance Notes
+## Vectorization Performance: R vs Julia
+
+**Important Note**: While vectorization is often faster in many languages, this is not always the case in Julia. Julia's JIT compilation can make explicit loops just as fast as vectorized operations.
 
 ### 1. Why R Needs Vectorization
 
@@ -7361,16 +7366,38 @@ end  # ~2.0 ms
   ```
 
 - Devectorized loops can:
-
   - Avoid temporary arrays
-
   - Fuse multiple operations in one pass
-
   - Allow more compiler optimizations
 
----
+### 3. When Vectorization Helps vs Hurts in Julia
 
-### 3\. High-Level vs Low-Level Vectorization
+```julia
+using BenchmarkTools
+
+# Vectorization is good when:
+# 1. The operation is simple and well-optimized
+arr = rand(1000)
+@btime sum($arr)  # Very fast - highly optimized
+
+# 2. You're using specialized functions
+@btime sqrt.($arr)  # Fast - uses optimized BLAS
+
+# Vectorization can hurt when:
+# 1. Creating unnecessary temporary arrays
+@btime result = $arr .* 2 .+ 1  # Creates intermediate arrays
+
+# 2. Complex operations that don't vectorize well
+function complex_operation(x)
+    # Complex logic that's hard to vectorize
+    return x > 0 ? sqrt(x) : -sqrt(-x)
+end
+
+# Loop version might be faster
+@btime [complex_operation(x) for x in $arr]
+```
+
+### 4. High-Level vs Low-Level Vectorization
 
 | Term                                   | Meaning                                                        | Example                                     |
 | -------------------------------------- | -------------------------------------------------------------- | ------------------------------------------- |
@@ -7379,7 +7406,7 @@ end  # ~2.0 ms
 
 ---
 
-### 4\. LoopVectorization.jl
+### 5. LoopVectorization.jl
 
 - Julia’s compiler can auto-vectorize loops, but **LLVM is conservative**.
 
@@ -7420,7 +7447,28 @@ end
 
 ---
 
-### 5\. Summary Table
+### 6. Best Practices for Performance
+
+```julia
+# 1. Profile first, optimize second
+using Profile
+
+# 2. Use @inbounds for performance-critical loops
+function fast_loop(arr)
+    @inbounds for i in eachindex(arr)
+        arr[i] *= 2
+    end
+end
+
+# 3. Consider using views to avoid copying
+view_arr = view(large_array, 1:100, 1:100)
+
+# 4. Use broadcasting when appropriate
+# Good: arr .* 2
+# Bad: map(x -> x * 2, arr)  # Creates unnecessary function calls
+```
+
+### 7. Summary Table
 
 | Language  | Loops              | Vectorization Purpose                                 |
 | --------- | ------------------ | ----------------------------------------------------- |
@@ -8962,77 +9010,6 @@ function print_reference_tree(container, name="container")
         println("  [$i] → objectid: $(objectid(item))")
     end
 end
-```
-
----
-
-## Vectorizing Does Not Always Improve Speed
-
-**Important Note**: While vectorization is often faster in many languages, this is not always the case in Julia. Julia's JIT compilation can make explicit loops just as fast as vectorized operations.
-
-### Why Vectorization Isn't Always Better in Julia
-
-```julia
-using BenchmarkTools
-
-# Example: Simple array operation
-arr = rand(1000)
-
-# Vectorized approach
-@btime $arr .* 2
-
-# Explicit loop approach
-@btime for i in eachindex($arr)
-    $arr[i] *= 2
-end
-
-# Often, both approaches have similar performance in Julia
-# The compiler can optimize both effectively
-```
-
-### When Vectorization Helps vs Hurts
-
-```julia
-# Vectorization is good when:
-# 1. The operation is simple and well-optimized
-@btime sum($arr)  # Very fast - highly optimized
-
-# 2. You're using specialized functions
-@btime sqrt.($arr)  # Fast - uses optimized BLAS
-
-# Vectorization can hurt when:
-# 1. Creating unnecessary temporary arrays
-@btime result = $arr .* 2 .+ 1  # Creates intermediate arrays
-
-# 2. Complex operations that don't vectorize well
-function complex_operation(x)
-    # Complex logic that's hard to vectorize
-    return x > 0 ? sqrt(x) : -sqrt(-x)
-end
-
-# Loop version might be faster
-@btime [complex_operation(x) for x in $arr]
-```
-
-### Best Practices for Performance
-
-```julia
-# 1. Profile first, optimize second
-using Profile
-
-# 2. Use @inbounds for performance-critical loops
-function fast_loop(arr)
-    @inbounds for i in eachindex(arr)
-        arr[i] *= 2
-    end
-end
-
-# 3. Consider using views to avoid copying
-view_arr = view(large_array, 1:100, 1:100)
-
-# 4. Use broadcasting when appropriate
-# Good: arr .* 2
-# Bad: map(x -> x * 2, arr)  # Creates unnecessary function calls
 ```
 
 ---
@@ -12665,31 +12642,3 @@ function test_io_compatibility()
     end
 end
 ```
-
----
-
-## Vectorizing does not improve speed
-
-https://www.johnmyleswhite.com/notebook/2013/12/22/the-relationship-between-vectorized-and-devectorized-code/
-
-## Function Overloading, Methods, and Multiple Dispatch
-
-## Standard Library
-
-## Packages
-
-## Pluto
-
-Live Docs
-
-## Julia VSCode extension
-
-Workspace section
-
-## Help Resources
-
-`?` or `]?` for Pkg help
-
-Julia extension hover hints and ndocumetation tab
-
-Julia Discourse Forum
