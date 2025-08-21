@@ -512,7 +512,100 @@ data = [1, 2, 3, 4, 5]
 #### Closures vs Callable Objects
 
 ```julia
+# Both approaches can achieve similar results, but have different trade-offs
 
+# Approach 1: Callable Object
+struct GaussianCallable{T <: Real}
+    μ::T
+    σ::T
+end
+
+function (g::GaussianCallable{T})(x::Real) where T
+    return exp(-(x - g.μ)^2 / (2 * g.σ^2))
+end
+
+# Approach 2: Closure
+function make_gaussian(μ, σ)
+    return x -> exp(-(x - μ)^2 / (2 * σ^2))
+end
+
+# Usage comparison
+g1 = GaussianCallable(1.0, 0.5)
+g2 = make_gaussian(1.0, 0.5)
+
+@test g1(2) ≈ g2(2)
+@test g1(1.25) ≈ g2(1.25)
+```
+
+#### When to Use Each Approach
+
+```julia
+# Use Callable Objects when:
+# 1. You want to define multiple methods for the same type
+# 2. You need type stability and performance
+# 3. You want to extend Base functions
+# 4. You need complex type hierarchies
+
+# Use Closures when:
+# 1. You need simple function-like behavior
+# 2. You want to capture arbitrary data
+# 3. You need dynamic behavior
+# 4. You're creating one-off functions
+
+# Example: Callable object with multiple methods
+struct FunctionApproximator{T <: Real}
+    data::Vector{T}
+    method::Symbol
+end
+
+function (fa::FunctionApproximator)(x::Real)
+    if fa.method == :linear
+        return linear_interpolate(fa.data, x)
+    elseif fa.method == :polynomial
+        return polynomial_fit(fa.data, x)
+    else
+        error("Unknown method: $(fa.method)")
+    end
+end
+
+# Example: Closure for simple data transformation
+function make_transformer(operation)
+    return data -> operation(data)
+end
+```
+
+#### Performance Considerations
+
+```julia
+# Callable objects can be more type-stable
+struct FastGaussian{T <: Real}
+    μ::T
+    σ::T
+    inv_2σ²::T  # Pre-computed for performance
+end
+
+function FastGaussian(μ::T, σ::T) where T <: Real
+    return FastGaussian(μ, σ, inv(2 * σ^2))
+end
+
+function (g::FastGaussian{T})(x::Real) where T
+    return exp(-(x - g.μ)^2 * g.inv_2σ²)
+end
+
+# Closures can be less type-stable but more flexible
+function make_flexible_gaussian(μ, σ)
+    inv_2σ² = inv(2 * σ^2)
+    return x -> exp(-(x - μ)^2 * inv_2σ²)
+end
+
+# Benchmark comparison
+using BenchmarkTools
+
+g1 = FastGaussian(1.0, 0.5)
+g2 = make_flexible_gaussian(1.0, 0.5)
+
+@btime g1(2.0)  # Usually faster due to type stability
+@btime g2(2.0)  # May be slower due to type inference
 ```
 
 ### Memory Management and Garbage Collection
@@ -1087,17 +1180,690 @@ push!(array_version, 1001)  # This requires a real array
 
 ---
 
+## Arrays in Julia
 
+Arrays in Julia are mutable, indexed collections that store values in contiguous memory. Unlike ranges, arrays actually store all their elements.
 
+### Basic Array Creation
 
+```julia
+# Create arrays with different syntax
+arr1 = [1, 2, 3, 4, 5]           # Vector{Int64}
+arr2 = [1.0, 2.0, 3.0]           # Vector{Float64}
+arr3 = [1, 2.0, "three"]         # Vector{Any} (heterogeneous)
 
+# Multi-dimensional arrays
+matrix = [1 2 3; 4 5 6]          # 2×3 Matrix{Int64}
+```
 
+### Converting Ranges to Arrays
 
+```julia
+# Create a range
+r = 2:5  # 2:5 (UnitRange{Int64})
 
+# Convert to array with collect()
+arr = collect(r)  # [2, 3, 4, 5]
 
+# The dot syntax for element-wise operations
+rf = Float64.(r)  # [2.0, 3.0, 4.0, 5.0]
+println(rf)
+```
 
+### Why `Float64.(r)` Works
 
+The dot syntax `Float64.(r)` is Julia's **broadcasting** syntax. Here's what happens:
 
+1. **Broadcasting**: The `.` operator applies `Float64` to each element of the range `r`
+2. **Element-wise conversion**: Each integer in the range gets converted to a `Float64`
+3. **Array creation**: The result is a new `Vector{Float64}` containing the converted values
+
+```julia
+# This is equivalent to:
+rf = [Float64(x) for x in r]
+
+# Or using map:
+rf = map(Float64, r)
+
+# The dot syntax is just syntactic sugar for broadcasting
+```
+
+### Broadcasting vs Regular Function Calls
+
+```julia
+r = 2:5
+
+# This doesn't work - Float64 expects a single value
+# Float64(r)  # Error!
+
+# This works - broadcasting applies Float64 to each element
+Float64.(r)  # [2.0, 3.0, 4.0, 5.0]
+
+# Other broadcasting examples
+r .+ 10      # [12, 13, 14, 15]  (add 10 to each element)
+r .* 2       # [4, 6, 8, 10]     (multiply each element by 2)
+r .^ 2       # [4, 9, 16, 25]    (square each element)
+```
+
+### Array Types and Memory
+
+```julia
+# Arrays have concrete types based on their elements
+arr_int = [1, 2, 3]
+typeof(arr_int)  # Vector{Int64}
+
+arr_float = [1.0, 2.0, 3.0]
+typeof(arr_float)  # Vector{Float64}
+
+# Memory usage depends on the number of elements
+sizeof(arr_int)    # 24 bytes (3 Int64s)
+sizeof(arr_float)  # 24 bytes (3 Float64s)
+
+# Compare with ranges (much smaller!)
+r = 1:3
+sizeof(r)  # 24 bytes (3 Int64s) - same as array, but scales differently
+```
+
+### Array Operations
+
+```julia
+arr = [1, 2, 3, 4, 5]
+
+# Indexing (1-based in Julia)
+arr[1]      # 1
+arr[end]    # 5
+arr[2:4]    # [2, 3, 4]
+
+# Mutability
+arr[1] = 10  # arr is now [10, 2, 3, 4, 5]
+
+# Adding/removing elements
+push!(arr, 6)     # [10, 2, 3, 4, 5, 6]
+pop!(arr)         # returns 6, arr is [10, 2, 3, 4, 5]
+```
+
+### When to Use Arrays vs Ranges
+
+```julia
+# Use ranges when:
+# - You need to iterate over a sequence
+# - Memory efficiency is important
+# - You're doing indexing operations
+for i in 1:1000
+    # work with i
+end
+
+# Use arrays when:
+# - You need to modify elements
+# - You need random access to elements
+# - You're passing to functions that expect arrays
+arr = [1, 2, 3, 4, 5]
+arr[3] = 10  # Can modify individual elements
+```
+
+---
+
+## Creating Vectors of Specific Types
+
+Julia's type system allows you to create vectors with specific element types, which is crucial for performance and type safety.
+
+### Basic Type-Specific Vector Creation
+
+```julia
+# Create a vector of `String`s that has 3 undefined elements, then make the middle one equal to "Julia"
+vstr = Vector{String}(undef, 3)
+vstr[2] = "Julia"
+println(vstr)
+# Output: String[#undef, "Julia", #undef]
+
+# Test the vector properties
+@test length(vstr) == 3 && eltype(vstr) == String && !isassigned(vstr, 1) && !isassigned(vstr, 3) && vstr[2] == "Julia"
+```
+
+### Understanding `Vector{Type}(undef, size)`
+
+```julia
+# Syntax: Vector{ElementType}(undef, length)
+# - ElementType: The type of elements the vector will hold
+# - undef: Creates uninitialized elements
+# - length: The number of elements
+
+# Examples with different types:
+v_int = Vector{Int}(undef, 5)      # Vector{Int64} with 5 uninitialized elements
+v_float = Vector{Float64}(undef, 3) # Vector{Float64} with 3 uninitialized elements
+v_bool = Vector{Bool}(undef, 4)    # Vector{Bool} with 4 uninitialized elements
+v_any = Vector{Any}(undef, 2)      # Vector{Any} with 2 uninitialized elements
+```
+
+### What `undef` Means
+
+```julia
+# undef creates uninitialized elements
+v = Vector{Int}(undef, 3)
+
+# Check if elements are assigned
+isassigned(v, 1)  # false - element 1 is not assigned
+isassigned(v, 2)  # false - element 2 is not assigned
+isassigned(v, 3)  # false - element 3 is not assigned
+
+# Accessing unassigned elements can be dangerous
+# v[1]  # This might give undefined behavior or error
+
+# Assign values to specific elements
+v[2] = 42
+isassigned(v, 2)  # true - element 2 is now assigned
+v[2]              # 42
+```
+
+### Type Safety and Performance
+
+```julia
+# Type-specific vectors are more efficient
+v_int = Vector{Int}(undef, 1000)
+typeof(v_int)     # Vector{Int64}
+sizeof(v_int)     # 8000 bytes (8 bytes per Int64)
+
+v_any = Vector{Any}(undef, 1000)
+typeof(v_any)     # Vector{Any}
+sizeof(v_any)     # 8000 bytes (8 bytes per pointer, but elements stored separately)
+
+# Type-specific vectors allow compiler optimizations
+function sum_typed_vector(v::Vector{Int})
+    total = 0
+    for x in v
+        total += x  # Compiler knows x is always Int
+    end
+    return total
+end
+
+function sum_any_vector(v::Vector{Any})
+    total = 0
+    for x in v
+        total += x  # Compiler must check type of x each time
+    end
+    return total
+end
+```
+
+### Alternative Ways to Create Typed Vectors
+
+```julia
+# Method 1: Using Vector{Type}(undef, size)
+v1 = Vector{String}(undef, 3)
+
+# Method 2: Using Array{Type, 1}
+v2 = Array{String, 1}(undef, 3)
+
+# Method 3: Using similar() with type annotation
+v3 = similar(Vector{String}, 3)
+
+# Method 4: Using zeros/ones with type conversion
+v4 = zeros(Int, 3)        # [0, 0, 0]
+v5 = ones(Float64, 3)     # [1.0, 1.0, 1.0]
+
+# Method 5: Using fill()
+v6 = fill("", 3)          # ["", "", ""]
+v7 = fill(0.0, 3)         # [0.0, 0.0, 0.0]
+```
+
+### Working with Unassigned Elements
+
+```julia
+# Create a vector with unassigned elements
+v = Vector{String}(undef, 4)
+
+# Check assignment status
+for i in 1:length(v)
+    println("Element $i assigned: $(isassigned(v, i))")
+end
+
+# Assign elements selectively
+v[1] = "First"
+v[3] = "Third"
+
+# Check again
+for i in 1:length(v)
+    if isassigned(v, i)
+        println("Element $i: $(v[i])")
+    else
+        println("Element $i: unassigned")
+    end
+end
+```
+
+### Type Inference vs Explicit Types
+
+```julia
+# Type inference (Julia guesses the type)
+v1 = [1, 2, 3]           # Vector{Int64}
+v2 = [1.0, 2.0, 3.0]     # Vector{Float64}
+v3 = ["a", "b", "c"]     # Vector{String}
+
+# Explicit types (you specify the type)
+v4 = Vector{Int}(undef, 3)    # Vector{Int64} with unassigned elements
+v5 = Vector{Float64}(undef, 3) # Vector{Float64} with unassigned elements
+v6 = Vector{String}(undef, 3)  # Vector{String} with unassigned elements
+
+# Type promotion with explicit types
+v7 = Vector{Float64}(undef, 3)
+v7[1] = 1    # 1.0 (promoted to Float64)
+v7[2] = 2.5  # 2.5
+v7[3] = 3    # 3.0 (promoted to Float64)
+```
+
+### Common Use Cases
+
+```julia
+# 1. Pre-allocating vectors for performance
+function build_vector_slow(n)
+    result = []  # Vector{Any}
+    for i in 1:n
+        push!(result, i^2)
+    end
+    return result
+end
+
+function build_vector_fast(n)
+    result = Vector{Int}(undef, n)  # Pre-allocated Vector{Int}
+    for i in 1:n
+        result[i] = i^2
+    end
+    return result
+end
+
+# 2. Creating vectors for specific algorithms
+function create_workspace(n)
+    # Create typed vectors for algorithm workspace
+    temp = Vector{Float64}(undef, n)
+    result = Vector{Float64}(undef, n)
+    return temp, result
+end
+
+# 3. Type-stable functions
+function process_data(data::Vector{<:Number})
+    result = Vector{eltype(data)}(undef, length(data))
+    for i in eachindex(data)
+        result[i] = data[i] * 2
+    end
+    return result
+end
+```
+
+### Type Constraints and Flexibility
+
+```julia
+# Abstract types allow flexibility
+v_numbers = Vector{<:Number}(undef, 3)  # Can hold any Number subtype
+v_numbers[1] = 1      # Int
+v_numbers[2] = 2.5    # Float64
+v_numbers[3] = 3//4   # Rational
+
+# Union types for mixed content
+v_mixed = Vector{Union{Int, String}}(undef, 3)
+v_mixed[1] = 42
+v_mixed[2] = "hello"
+v_mixed[3] = 100
+
+# Type parameters for generic code
+function create_typed_vector(::Type{T}, n) where T
+    return Vector{T}(undef, n)
+end
+
+v_int = create_typed_vector(Int, 5)
+v_str = create_typed_vector(String, 3)
+```
+
+### Performance Implications
+
+```julia
+using BenchmarkTools
+
+# Compare typed vs untyped vectors
+n = 1_000_000
+
+# Typed vector
+v_typed = Vector{Int}(undef, n)
+for i in 1:n
+    v_typed[i] = i
+end
+
+# Untyped vector
+v_untyped = Vector{Any}(undef, n)
+for i in 1:n
+    v_untyped[i] = i
+end
+
+# Performance comparison
+@btime sum($v_typed)    # ~0.1 ms
+@btime sum($v_untyped)  # ~2.0 ms (20x slower!)
+```
+
+### Best Practices
+
+```julia
+# ✅ Good: Use typed vectors for performance
+v = Vector{Int}(undef, 1000)
+
+# ✅ Good: Pre-allocate when you know the size
+result = Vector{Float64}(undef, n)
+for i in 1:n
+    result[i] = compute_value(i)
+end
+
+# ✅ Good: Use type parameters for generic code
+function process_vector(v::Vector{T}) where T
+    result = Vector{T}(undef, length(v))
+    # ... process elements
+    return result
+end
+
+# ❌ Avoid: Using Any when you know the type
+v = Vector{Any}(undef, 1000)  # Less efficient
+
+# ❌ Avoid: Growing vectors in loops
+result = []
+for i in 1:1000
+    push!(result, i)  # Slow: reallocates memory
+end
+```
+
+---
+
+## Tuples in Julia
+
+Tuples are immutable, fixed-length collections that can hold elements of different types. They are lightweight, fast, and commonly used for returning multiple values from functions.
+
+### Basic Tuple Creation
+
+```julia
+# Create a tuple with a `String`, an `Int`, and a `Float64` (of your choice) in that order
+t = ("Hello", 1, 1.0)
+@test isa(t, Tuple) && isa(t[1], String) && isa(t[2], Int) && isa(t[3], Float64)
+
+# Tuple syntax
+t1 = (1, 2, 3)           # Tuple{Int64, Int64, Int64}
+t2 = ("a", 1, 2.5)       # Tuple{String, Int64, Float64}
+t3 = (1,)                # Single-element tuple (note the comma)
+t4 = ()                  # Empty tuple
+```
+
+### Tuple Properties
+
+```julia
+# Tuples are immutable
+t = (1, "hello", 3.14)
+# t[1] = 2  # ERROR: Cannot modify a tuple
+
+# Tuple length is fixed
+length(t)  # 3
+size(t)    # (3,) - tuple of dimensions
+
+# Tuple types are inferred from elements
+typeof(t)  # Tuple{Int64, String, Float64}
+
+# Tuples can contain any types
+mixed_tuple = (1, "hello", [1, 2, 3], (4, 5))
+typeof(mixed_tuple)  # Tuple{Int64, String, Vector{Int64}, Tuple{Int64, Int64}}
+```
+
+### Tuple Indexing and Access
+
+```julia
+t = ("Hello", 42, 3.14)
+
+# Indexing (1-based)
+t[1]    # "Hello"
+t[2]    # 42
+t[3]    # 3.14
+t[end]  # 3.14
+
+# Destructuring (unpacking)
+a, b, c = t
+# a = "Hello", b = 42, c = 3.14
+
+# Partial destructuring
+first, rest... = t
+# first = "Hello", rest = (42, 3.14)
+
+# Named tuples (more on this later)
+nt = (name="Alice", age=30, city="New York")
+nt.name  # "Alice"
+nt[:age] # 30
+```
+
+### Tuple vs Array Comparison
+
+```julia
+# Tuples: immutable, fixed length, heterogeneous
+tuple_example = (1, "hello", 3.14)
+typeof(tuple_example)  # Tuple{Int64, String, Float64}
+
+# Arrays: mutable, variable length, homogeneous
+array_example = [1, "hello", 3.14]
+typeof(array_example)  # Vector{Any}
+
+# Performance comparison
+using BenchmarkTools
+
+# Tuple access (fast)
+t = (1, 2, 3, 4, 5)
+@btime $t[3]  # ~0.001 ns
+
+# Array access (slower for small arrays)
+a = [1, 2, 3, 4, 5]
+@btime $a[3]  # ~1-2 ns
+```
+
+### Common Tuple Use Cases
+
+```julia
+# 1. Returning multiple values from functions
+function get_coordinates()
+    return (10, 20)  # Returns a tuple
+end
+
+x, y = get_coordinates()  # Destructuring
+# x = 10, y = 20
+
+# 2. Function arguments
+function plot_point((x, y))
+    println("Plotting point at ($x, $y)")
+end
+
+plot_point((5, 10))  # Pass tuple as argument
+
+# 3. Iteration
+for (i, value) in enumerate([1, 2, 3])
+    println("Index $i: $value")
+end
+
+# 4. Dictionary iteration
+dict = Dict("a" => 1, "b" => 2)
+for (key, value) in dict
+    println("$key => $value")
+end
+```
+
+### Tuple Operations
+
+```julia
+# Concatenation
+t1 = (1, 2)
+t2 = (3, 4)
+t3 = (t1..., t2...)  # (1, 2, 3, 4)
+
+# Splatting (unpacking)
+function sum_three(a, b, c)
+    return a + b + c
+end
+
+t = (1, 2, 3)
+sum_three(t...)  # Equivalent to sum_three(1, 2, 3)
+
+# Tuple comprehension (creates array, not tuple)
+squares = [x^2 for x in (1, 2, 3, 4)]  # [1, 4, 9, 16]
+
+# Converting between tuples and arrays
+arr = [1, 2, 3]
+tup = Tuple(arr)  # (1, 2, 3)
+
+tup2 = (1, 2, 3)
+arr2 = collect(tup2)  # [1, 2, 3]
+```
+
+### Named Tuples
+
+```julia
+# Named tuples provide field names
+person = (name="Alice", age=30, city="New York")
+typeof(person)  # NamedTuple{(:name, :age, :city), Tuple{String, Int64, String}}
+
+# Access by field name
+person.name    # "Alice"
+person[:age]   # 30
+person.city    # "New York"
+
+# Destructuring with names
+name, age, city = person
+# name = "Alice", age = 30, city = "New York"
+
+# Named tuple construction
+nt1 = (a=1, b=2)
+nt2 = (; a=1, b=2)  # Alternative syntax
+nt3 = NamedTuple{(:a, :b)}((1, 2))  # Explicit construction
+```
+
+### Tuple Performance Characteristics
+
+```julia
+# Tuples are stack-allocated (fast)
+using BenchmarkTools
+
+# Small tuples are very fast
+@btime (1, 2, 3)  # ~0.001 ns
+
+# Tuple access is fast
+t = (1, 2, 3, 4, 5)
+@btime $t[3]  # ~0.001 ns
+
+# Tuple destructuring is fast
+@btime let (a, b, c) = $t; a + b + c end  # ~0.001 ns
+
+# Comparison with arrays
+arr = [1, 2, 3, 4, 5]
+@btime $arr[3]  # ~1-2 ns (slower due to heap allocation)
+```
+
+### Tuple Type System
+
+```julia
+# Tuple types are parameterized by element types
+t1 = (1, 2, 3)
+typeof(t1)  # Tuple{Int64, Int64, Int64}
+
+t2 = (1, "hello", 3.14)
+typeof(t2)  # Tuple{Int64, String, Float64}
+
+# Type stability with tuples
+function stable_function()
+    return (1, 2.0)  # Type-stable return
+end
+
+function unstable_function()
+    if rand() > 0.5
+        return (1, 2.0)
+    else
+        return (1, 2)  # Different type!
+    end
+end
+
+# Tuple type parameters
+Tuple{Int, String}  # Type of tuple with Int and String
+Tuple{Vararg{Int}}  # Type of tuple with any number of Ints
+```
+
+### Advanced Tuple Features
+
+```julia
+# Varargs tuples (variable number of arguments)
+function sum_all(args...)
+    return sum(args)
+end
+
+sum_all(1, 2, 3, 4)  # 10
+
+# Tuple type constraints
+function process_coordinates((x, y)::Tuple{Number, Number})
+    return sqrt(x^2 + y^2)
+end
+
+process_coordinates((3, 4))  # 5.0
+
+# Tuple broadcasting
+t1 = (1, 2, 3)
+t2 = (4, 5, 6)
+# t1 .+ t2  # ERROR: No broadcasting for tuples
+
+# But you can convert to arrays
+collect(t1) .+ collect(t2)  # [5, 7, 9]
+```
+
+### Tuple Best Practices
+
+```julia
+# ✅ Good: Use tuples for small, fixed collections
+coordinates = (x, y) = (10, 20)
+
+# ✅ Good: Use tuples for multiple return values
+function get_min_max(arr)
+    return (minimum(arr), maximum(arr))
+end
+
+# ✅ Good: Use tuples for function arguments
+function plot_line((x1, y1), (x2, y2))
+    # Plot line from (x1,y1) to (x2,y2)
+end
+
+# ✅ Good: Use named tuples for structured data
+person = (name="Bob", age=25, city="Boston")
+
+# ❌ Avoid: Using tuples for large collections
+# Use arrays instead: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# ❌ Avoid: Modifying tuple-like data
+# Use arrays if you need mutability
+
+# ✅ Good: Use tuples for type-stable return values
+function get_dimensions()
+    return (width, height) = (1920, 1080)
+end
+```
+
+### Tuple vs Other Collections
+
+```julia
+# Comparison table:
+
+# Tuples: immutable, fixed length, stack-allocated
+t = (1, 2, 3)
+
+# Arrays: mutable, variable length, heap-allocated
+a = [1, 2, 3]
+
+# Named tuples: immutable, fixed length, named fields
+nt = (a=1, b=2, c=3)
+
+# Vectors: mutable, variable length, homogeneous
+v = [1, 2, 3]
+
+# Performance characteristics:
+# - Tuples: fastest for small, fixed data
+# - Arrays: good for large, variable data
+# - Named tuples: good for structured, fixed data
+# - Vectors: good for large, homogeneous data
+```
+
+---
 
 ## Named Tuples in Julia
 
@@ -4269,8 +5035,6 @@ end
 
 ---
 
----
-
 ## Sets in Julia
 
 Sets are unordered collections of unique elements that provide fast membership testing and set operations. They're perfect for tracking unique values and performing mathematical set operations.
@@ -6557,362 +7321,7 @@ end  # ~2.0 ms
 
 ---
 
-## Language Comparisons
-
-Julia is designed to be familiar to users of other programming languages while providing unique features and performance characteristics. This section highlights key differences between Julia and other popular languages.
-
-### Julia vs MATLAB
-
-Although MATLAB users may find Julia's syntax familiar, Julia is not a MATLAB clone. There are major syntactic and functional differences:
-
-- **Array Indexing**: Julia arrays are indexed with square brackets `A[i,j]`, not parentheses
-- **Array Assignment**: Julia arrays are not copied when assigned to another variable. After `A = B`, changing elements of `B` will modify `A` as well
-- **Array Growth**: Julia does not automatically grow arrays in assignment statements. Use `push!` and `append!` for efficient array growth
-- **Imaginary Unit**: The imaginary unit `sqrt(-1)` is represented as `im`, not `i` or `j`
-- **Multiple Returns**: Julia uses tuples for multiple return values: `(a, b) = (1, 2)` or `a, b = 1, 2`
-- **Ranges**: Julia's `a:b` constructs `AbstractRange` objects, not full vectors
-- **Logical Operations**: Use `A .== B` for element-wise comparison, not `A == B`
-- **Bitwise Operations**: Use `&`, `|`, and `⊻` for bitwise operations
-- **Structs**: Julia's `struct`s are immutable by default and don't support dynamic field addition
-
-### Julia vs Python
-
-Julia shares some syntax with Python but has important differences:
-
-- **Block Structure**: Julia uses `end` to terminate blocks, not indentation
-- **String Concatenation**: Use `*` for string concatenation, not `+`
-- **Indexing**: Julia uses 1-based indexing, not 0-based
-- **Array Types**: Julia's `Vector{T}` provides type safety and performance
-- **Matrix Operations**: `A * B` performs matrix multiplication in Julia, not element-wise multiplication
-- **Multiple Dispatch**: Julia's function system is more powerful than Python's class system
-- **Type System**: Julia has a sophisticated type system with parametric types
-- **Performance**: Julia code can be as fast as C, while Python requires optimization
-
-### Julia vs R
-
-Julia aims to be an effective language for data analysis and statistical programming:
-
-- **String Handling**: Julia's single quotes enclose characters, not strings
-- **Vector Construction**: Use `[1, 2, 3]` instead of `c(1, 2, 3)`
-- **Logical Indexing**: Julia's logical indexing is more restrictive than R's
-- **Vector Operations**: Julia doesn't allow operations on vectors of different lengths
-- **Matrix Operations**: Use `A * B` for matrix multiplication, not `A %*% B`
-- **Missing Values**: Use `missing` instead of `NA`
-- **Performance**: Julia doesn't require vectorization for performance
-- **Type System**: Julia's type system provides better performance and safety
-
-### Julia vs C/C++
-
-Julia provides high-level syntax with C-like performance:
-
-- **Indexing**: Julia uses 1-based indexing, not 0-based
-- **Memory Management**: Julia has automatic memory management with garbage collection
-- **Array Layout**: Julia arrays are column-major (Fortran order), not row-major
-- **Type System**: Julia's type system is more sophisticated than C/C++
-- **Multiple Dispatch**: Julia's function system is more flexible than C++'s
-- **Modules**: Julia's module system is more powerful than C++ namespaces
-- **Performance**: Julia can achieve C-like performance without manual optimization
-
-### Performance Benchmarks
-
-Julia's performance characteristics make it competitive with compiled languages:
-
-```julia
-# Julia performance is often comparable to C/C++
-# Example: Matrix multiplication
-using BenchmarkTools
-
-A = rand(1000, 1000)
-B = rand(1000, 1000)
-
-@btime A * B  # Often as fast as optimized C/C++ code
-```
-
-### Key Advantages of Julia
-
-1. **Performance**: Julia code can be as fast as C/C++ without manual optimization
-2. **Productivity**: High-level syntax similar to Python/MATLAB
-3. **Type System**: Sophisticated type system with parametric types
-4. **Multiple Dispatch**: Powerful function system based on argument types
-5. **Interoperability**: Easy integration with C, Python, and R
-6. **Scientific Computing**: Built-in support for linear algebra and numerical computing
-
----
-
-## Data Structures
-
-Julia provides a rich set of data structures optimized for different use cases. Understanding when and how to use each type is crucial for writing efficient Julia code.
-
-### Arrays and Vectors
-
-Arrays in Julia are mutable, indexed collections that store values in contiguous memory. They are the most commonly used data structure for numerical computing and general-purpose collections.
-
-#### Basic Array Creation and Manipulation
-
-```julia
-# Create arrays with different syntax
-arr1 = [1, 2, 3, 4, 5]           # Vector{Int64}
-arr2 = [1.0, 2.0, 3.0]           # Vector{Float64}
-arr3 = ["a", "b", "c"]            # Vector{String}
-
-# Multi-dimensional arrays
-matrix = [1 2 3; 4 5 6; 7 8 9]   # 3x3 Matrix{Int64}
-array_3d = rand(2, 3, 4)         # 2x3x4 Array{Float64,3}
-```
-
-#### Type-Specific Vectors
-
-Julia's type system allows you to create vectors with specific element types, which is crucial for performance and type safety.
-
-```julia
-# Create typed vectors for better performance
-v1 = Vector{Int}(undef, 1000)     # Pre-allocated Int vector
-v2 = Vector{Float64}(undef, 1000) # Pre-allocated Float64 vector
-v3 = Vector{String}(undef, 100)   # Pre-allocated String vector
-
-# Type-specific vectors are more efficient
-@btime sum(Vector{Int}(1:1000))   # ~100 ns
-@btime sum(Vector{Any}(1:1000))   # ~10,000 ns (100x slower!)
-```
-
-#### Performance Considerations
-
-```julia
-# ✅ Good: Pre-allocate vectors for performance
-function fast_sum(n)
-    result = Vector{Int}(undef, n)
-    for i in 1:n
-        result[i] = i^2
-    end
-    return sum(result)
-end
-
-# ❌ Avoid: Growing vectors in loops
-function slow_sum(n)
-    result = Int[]
-    for i in 1:n
-        push!(result, i^2)  # Allocates new array each time
-    end
-    return sum(result)
-end
-```
-
-### Matrices
-
-Matrices are 2D arrays with specialized operations for linear algebra and scientific computing.
-
-#### Creation and Operations
-
-```julia
-# Create matrices
-A = [1 2 3; 4 5 6; 7 8 9]        # 3x3 matrix
-B = rand(3, 3)                   # Random 3x3 matrix
-I = Matrix(I, 3, 3)              # 3x3 identity matrix
-
-# Matrix operations
-C = A * B                         # Matrix multiplication
-D = A .* B                        # Element-wise multiplication
-E = A'                            # Transpose
-F = inv(A)                        # Matrix inverse
-```
-
-#### Memory Layout (Column-Major)
-
-Julia arrays use column-major layout (Fortran order), which affects performance:
-
-```julia
-# Column-major access is faster
-matrix = rand(1000, 1000)
-
-# Fast: iterate by columns
-function fast_iteration(matrix)
-    sum = 0.0
-    for j in 1:size(matrix, 2)
-        for i in 1:size(matrix, 1)
-            sum += matrix[i, j]
-        end
-    end
-    return sum
-end
-
-# Slow: iterate by rows
-function slow_iteration(matrix)
-    sum = 0.0
-    for i in 1:size(matrix, 1)
-        for j in 1:size(matrix, 2)
-            sum += matrix[i, j]
-        end
-    end
-    return sum
-end
-```
-
-### Tuples and Named Tuples
-
-Tuples are immutable, fixed-length collections that can hold elements of different types. They are lightweight, fast, and commonly used for returning multiple values from functions.
-
-#### Basic Tuples
-
-```julia
-# Create tuples
-t1 = (1, 2, 3)                    # Tuple{Int64, Int64, Int64}
-t2 = (1, "hello", 3.14)           # Tuple{Int64, String, Float64}
-t3 = (1,)                         # Single-element tuple (note the comma)
-
-# Tuples are immutable
-# t1[1] = 10  # ERROR: Cannot modify tuple
-
-# Tuples can contain any types
-t4 = ([1, 2, 3], "vector")        # Tuple{Vector{Int64}, String}
-```
-
-#### Named Tuples
-
-Named tuples are immutable collections with named fields, providing a lightweight alternative to structs for simple data structures.
-
-```julia
-# Create named tuples
-nt1 = (x=1, y=2, z=3)             # NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
-nt2 = (name="Julia", version=1.8)  # NamedTuple{(:name, :version), Tuple{String, Int64}}
-
-# Access fields
-nt1.x                             # 1
-nt1[:x]                           # 1 (symbol indexing)
-nt1[1]                            # 1 (integer indexing)
-
-# Merging named tuples
-nt3 = merge(nt1, (w=4,))          # (x=1, y=2, z=3, w=4)
-```
-
-#### Destructuring
-
-```julia
-# Destructure tuples
-x, y, z = (1, 2, 3)
-println("x=$x, y=$y, z=$z")       # x=1, y=2, z=3
-
-# Destructure named tuples
-point = (x=10, y=20)
-x, y = point                      # x=10, y=20
-
-# Selective destructuring
-(; x) = point                     # Only extract x
-println("x=$x")                   # x=10
-```
-
-### Dictionaries and Sets
-
-Dictionaries provide key-value storage, while sets store unique elements efficiently.
-
-#### Dictionaries
-
-```julia
-# Create dictionaries
-d1 = Dict{String, Int}()          # Empty typed dictionary
-d2 = Dict("a" => 1, "b" => 2)     # Dictionary with initial values
-d3 = Dict{Char, Int}()            # Empty dictionary with specific types
-
-# Dictionary operations
-d2["c"] = 3                       # Add new key-value pair
-haskey(d2, "a")                   # true
-get(d2, "d", 0)                   # 0 (default value if key doesn't exist)
-delete!(d2, "b")                  # Remove key-value pair
-
-# Iterate over dictionaries
-for (key, value) in d2
-    println("$key => $value")
-end
-```
-
-#### Sets
-
-```julia
-# Create sets
-s1 = Set{Int}()                   # Empty typed set
-s2 = Set([1, 2, 3, 4, 5])         # Set from array
-s3 = Set("hello")                 # Set of characters
-
-# Set operations
-push!(s1, 1)                      # Add element
-pop!(s1, 1)                       # Remove element
-union(s1, s2)                     # Union of sets
-intersect(s1, s2)                 # Intersection of sets
-setdiff(s1, s2)                   # Set difference
-```
-
-### Strings
-
-Strings in Julia are immutable sequences of characters with powerful manipulation capabilities.
-
-#### String Manipulation
-
-```julia
-# String creation and concatenation
-str1 = "Hello"
-str2 = "World"
-str3 = str1 * " " * str2          # "Hello World"
-
-# String interpolation
-name = "Julia"
-greeting = "Hello, $name!"        # "Hello, Julia!"
-
-# String functions
-split("a,b,c", ",")               # ["a", "b", "c"]
-join(["a", "b", "c"], "-")        # "a-b-c"
-replace("hello world", "o" => "0") # "hell0 w0rld"
-strip("  hello  ")                # "hello"
-```
-
-#### Regular Expressions
-
-```julia
-# Basic regex usage
-text = "The year is 2023"
-pattern = r"\d{4}"                # Match 4 digits
-match(pattern, text)              # RegexMatch("2023")
-
-# Find all matches
-text = "Years: 2020, 2021, 2022, 2023"
-pattern = r"\d{4}"
-collect(eachmatch(pattern, text)) # Array of matches
-
-# String replacement with regex
-replace(text, r"\d{4}" => "YEAR") # "Years: YEAR, YEAR, YEAR, YEAR"
-```
-
-#### Performance Tips
-
-```julia
-# ✅ Good: Use string interpolation for concatenation
-name = "Julia"
-greeting = "Hello, $name!"        # Fast
-
-# ❌ Avoid: String concatenation in loops
-result = ""
-for i in 1:1000
-    result = result * string(i)   # Slow: creates new string each time
-end
-
-# ✅ Good: Use join for multiple strings
-result = join([string(i) for i in 1:1000], "")  # Fast
-```
-
----
-
-## Performance in Julia
-
-Julia is designed for high performance, combining the ease of use of dynamic languages with the speed of compiled languages. Understanding Julia's performance characteristics is crucial for writing efficient code.
-
-### Why Julia is Fast
-
-1. **JIT Compilation**: Julia compiles code to optimized machine code at runtime
-2. **Type Stability**: Julia's type system allows for aggressive optimizations
-3. **Multiple Dispatch**: Specialized code paths for different argument types
-4. **Memory Layout**: Column-major layout optimized for scientific computing
-5. **SIMD Optimization**: Automatic vectorization of operations
-6. **Allocation Optimization**: Compiler can eliminate temporary allocations
-
-### Vectorization Performance: R vs Julia
+## Vectorization Performance: R vs Julia
 
 **Important Note**: While vectorization is often faster in many languages, this is not always the case in Julia. Julia's JIT compilation can make explicit loops just as fast as vectorized operations.
 
@@ -7070,6 +7479,273 @@ view_arr = view(large_array, 1:100, 1:100)
 - In **R**, vectorization is a workaround for slow loops.
 - In **Julia**, loops are already fast — devectorized loops can even be faster.
 - **LoopVectorization.jl** is about _hardware-level SIMD_, not R-style vectorization.
+
+# [Noteworthy Differences from other Languages](#Noteworthy-Differences-from-other-Languages)[](#Noteworthy-Differences-from-other-Languages "Permalink")
+
+## [Noteworthy differences from MATLAB](#Noteworthy-differences-from-MATLAB)[](#Noteworthy-differences-from-MATLAB "Permalink")
+
+Although MATLAB users may find Julia's syntax familiar, Julia is not a MATLAB clone. There are major syntactic and functional differences. The following are some noteworthy differences that may trip up Julia users accustomed to MATLAB:
+
+- Julia arrays are indexed with square brackets, `A[i,j]`.
+- Julia arrays are not copied when assigned to another variable. After `A = B`, changing elements of `B` will modify `A` as well. To avoid this, use `A = copy(B)`.
+- Julia values are not copied when passed to a function. If a function modifies an array, the changes will be visible in the caller.
+- Julia does not automatically grow arrays in an assignment statement. Whereas in MATLAB `a(4) = 3.2` can create the array `a = [0 0 0 3.2]` and `a(5) = 7` can grow it into `a = [0 0 0 3.2 7]`, the corresponding Julia statement `a[5] = 7` throws an error if the length of `a` is less than 5 or if this statement is the first use of the identifier `a`. Julia has [`push!`](../../base/collections/#Base.push!) and [`append!`](../../base/collections/#Base.append!), which grow `Vector`s much more efficiently than MATLAB's `a(end+1) = val`.
+- The imaginary unit `sqrt(-1)` is represented in Julia as [`im`](../../base/numbers/#Base.im), not `i` or `j` as in MATLAB.
+- In Julia, literal numbers without a decimal point (such as `42`) create integers instead of floating point numbers. As a result, some operations can throw a domain error if they expect a float; for example, `julia> a = -1; 2^a` throws a domain error, as the result is not an integer (see [the FAQ entry on domain errors](../faq/#faq-domain-errors) for details).
+- In Julia, multiple values are returned and assigned as tuples, e.g. `(a, b) = (1, 2)` or `a, b = 1, 2`. MATLAB's `nargout`, which is often used in MATLAB to do optional work based on the number of returned values, does not exist in Julia. Instead, users can use optional and keyword arguments to achieve similar capabilities.
+- Julia has true one-dimensional arrays. Column vectors are of size `N`, not `Nx1`. For example, [`rand(N)`](../../stdlib/Random/#Base.rand) makes a 1-dimensional array.
+- In Julia, `[x,y,z]` will always construct a 3-element array containing `x`, `y` and `z`.
+  - To concatenate in the first ("vertical") dimension use either [`vcat(x,y,z)`](../../base/arrays/#Base.vcat) or separate with semicolons (`[x; y; z]`).
+  - To concatenate in the second ("horizontal") dimension use either [`hcat(x,y,z)`](../../base/arrays/#Base.hcat) or separate with spaces (`[x y z]`).
+  - To construct block matrices (concatenating in the first two dimensions), use either [`hvcat`](../../base/arrays/#Base.hvcat) or combine spaces and semicolons (`[a b; c d]`).
+- In Julia, `a:b` and `a:b:c` construct `AbstractRange` objects. To construct a full vector like in MATLAB, use [`collect(a:b)`](../../base/collections/#Base.collect-Tuple{Any}). Generally, there is no need to call `collect` though. An `AbstractRange` object will act like a normal array in most cases but is more efficient because it lazily computes its values. This pattern of creating specialized objects instead of full arrays is used frequently, and is also seen in functions such as [`range`](../../base/math/#Base.range), or with iterators such as `enumerate`, and `zip`. The special objects can mostly be used as if they were normal arrays.
+- Functions in Julia return values from their last expression or the `return` keyword instead of listing the names of variables to return in the function definition (see [The return Keyword](../functions/#The-return-Keyword) for details).
+- A Julia script may contain any number of functions, and all definitions will be externally visible when the file is loaded. Function definitions can be loaded from files outside the current working directory.
+- In Julia, reductions such as [`sum`](../../base/collections/#Base.sum), [`prod`](../../base/collections/#Base.prod), and [`maximum`](../../base/collections/#Base.maximum) are performed over every element of an array when called with a single argument, as in `sum(A)`, even if `A` has more than one dimension.
+- In Julia, parentheses must be used to call a function with zero arguments, like in [`rand()`](../../stdlib/Random/#Base.rand).
+- Julia discourages the use of semicolons to end statements. The results of statements are not automatically printed (except at the interactive prompt), and lines of code do not need to end with semicolons. [`println`](../../base/io-network/#Base.println) or [`@printf`](../../stdlib/Printf/#Printf.@printf) can be used to print specific output.
+- In Julia, if `A` and `B` are arrays, logical comparison operations like `A == B` do not return an array of booleans. Instead, use `A .== B`, and similarly for the other boolean operators like [`<`](../../base/math/#Base.:<), [`>`](../../base/math/#Base.:>).
+- In Julia, the operators [`&`](../../base/math/#Base.:&), [`|`](../../base/math/#Base.:|), and [`⊻`](../../base/math/#Base.xor) ([`xor`](../../base/math/#Base.xor)) perform the bitwise operations equivalent to `and`, `or`, and `xor` respectively in MATLAB, and have precedence similar to Python's bitwise operators (unlike C). They can operate on scalars or element-wise across arrays and can be used to combine logical arrays, but note the difference in order of operations: parentheses may be required (e.g., to select elements of `A` equal to 1 or 2 use `(A .== 1) .| (A .== 2)`).
+- In Julia, the elements of a collection can be passed as arguments to a function using the splat operator `...`, as in `xs=[1,2]; f(xs...)`.
+- Julia's [`svd`](../../stdlib/LinearAlgebra/#LinearAlgebra.svd) returns singular values as a vector instead of as a dense diagonal matrix.
+- In Julia, `...` is not used to continue lines of code. Instead, incomplete expressions automatically continue onto the next line.
+- In both Julia and MATLAB, the variable `ans` is set to the value of the last expression issued in an interactive session. In Julia, unlike MATLAB, `ans` is not set when Julia code is run in non-interactive mode.
+- Julia's `struct`s do not support dynamically adding fields at runtime, unlike MATLAB's `class`es. Instead, use a [`Dict`](../../base/collections/#Base.Dict). Dict in Julia isn't ordered.
+- In Julia each module has its own global scope/namespace, whereas in MATLAB there is just one global scope.
+- In MATLAB, an idiomatic way to remove unwanted values is to use logical indexing, like in the expression `x(x>3)` or in the statement `x(x>3) = []` to modify `x` in-place. In contrast, Julia provides the higher order functions [`filter`](../../base/collections/#Base.filter) and [`filter!`](../../base/collections/#Base.filter!), allowing users to write `filter(z->z>3, x)` and `filter!(z->z>3, x)` as alternatives to the corresponding transliterations `x[x.>3]` and `x = x[x.>3]`. Using [`filter!`](../../base/collections/#Base.filter!) reduces the use of temporary arrays.
+- The analogue of extracting (or "dereferencing") all elements of a cell array, e.g. in `vertcat(A{:})` in MATLAB, is written using the splat operator in Julia, e.g. as `vcat(A...)`.
+- In Julia, the `adjoint` function performs conjugate transposition; in MATLAB, `adjoint` provides the "adjugate" or classical adjoint, which is the transpose of the matrix of cofactors.
+- In Julia, a^b^c is evaluated a^(b^c) while in MATLAB it's (a^b)^c.
+
+## [Noteworthy differences from R](#Noteworthy-differences-from-R)[](#Noteworthy-differences-from-R "Permalink")
+
+One of Julia's goals is to provide an effective language for data analysis and statistical programming. For users coming to Julia from R, these are some noteworthy differences:
+
+- Julia's single quotes enclose characters, not strings.
+- Julia can create substrings by indexing into strings. In R, strings must be converted into character vectors before creating substrings.
+- In Julia, like Python but unlike R, strings can be created with triple quotes `""" ... """`. This syntax is convenient for constructing strings that contain line breaks.
+- In Julia, varargs are specified using the splat operator `...`, which always follows the name of a specific variable, unlike R, for which `...` can occur in isolation.
+- In Julia, modulus is `mod(a, b)`, not `a %% b`. `%` in Julia is the remainder operator.
+- Julia constructs vectors using brackets. Julia's `[1, 2, 3]` is the equivalent of R's `c(1, 2, 3)`.
+- In Julia, not all data structures support logical indexing. Furthermore, logical indexing in Julia is supported only with vectors of length equal to the object being indexed. For example:
+
+  - In R, `c(1, 2, 3, 4)[c(TRUE, FALSE)]` is equivalent to `c(1, 3)`.
+  - In R, `c(1, 2, 3, 4)[c(TRUE, FALSE, TRUE, FALSE)]` is equivalent to `c(1, 3)`.
+  - In Julia, `[1, 2, 3, 4][[true, false]]` throws a [`BoundsError`](../../base/base/#Core.BoundsError).
+  - In Julia, `[1, 2, 3, 4][[true, false, true, false]]` produces `[1, 3]`.
+
+- Like many languages, Julia does not always allow operations on vectors of different lengths, unlike R where the vectors only need to share a common index range. For example, `c(1, 2, 3, 4) + c(1, 2)` is valid R but the equivalent `[1, 2, 3, 4] + [1, 2]` will throw an error in Julia.
+- Julia allows an optional trailing comma when that comma does not change the meaning of code. This can cause confusion among R users when indexing into arrays. For example, `x[1,]` in R would return the first row of a matrix; in Julia, however, the comma is ignored, so `x[1,] == x[1]`, and will return the first element. To extract a row, be sure to use `:`, as in `x[1,:]`.
+- Julia's [`map`](../../base/collections/#Base.map) takes the function first, then its arguments, unlike `lapply(<structure>, function, ...)` in R. Similarly Julia's equivalent of `apply(X, MARGIN, FUN, ...)` in R is [`mapslices`](../../base/arrays/#Base.mapslices) where the function is the first argument.
+- Multivariate apply in R, e.g. `mapply(choose, 11:13, 1:3)`, can be written as `broadcast(binomial, 11:13, 1:3)` in Julia. Equivalently Julia offers a shorter dot syntax for vectorizing functions `binomial.(11:13, 1:3)`.
+- Julia uses `end` to denote the end of conditional blocks, like `if`, loop blocks, like `while`/ `for`, and functions. In lieu of the one-line `if ( cond ) statement`, Julia allows statements of the form `if cond; statement; end`, `cond && statement` and `!cond || statement`. Assignment statements in the latter two syntaxes must be explicitly wrapped in parentheses, e.g. `cond && (x = value)`.
+- In Julia, `<-`, `<<-` and `->` are not assignment operators.
+- Julia's `->` creates an anonymous function.
+- Julia's [`*`](../../base/math/#Base.:_-Tuple{Any, Vararg{Any}}) operator can perform matrix multiplication, unlike in R. If `A` and `B` are matrices, then `A _ B`denotes a matrix multiplication in Julia, equivalent to R's`A %_% B`. In R, this same notation would perform an element-wise (Hadamard) product. To get the element-wise multiplication operation, you need to write `A ._ B` in Julia.
+- Julia performs matrix transposition using the `transpose` function and conjugated transposition using the `'` operator or the `adjoint` function. Julia's `transpose(A)` is therefore equivalent to R's `t(A)`. Additionally a non-recursive transpose in Julia is provided by the `permutedims` function.
+- Julia does not require parentheses when writing `if` statements or `for`/`while` loops: use `for i in [1, 2, 3]` instead of `for (i in c(1, 2, 3))` and `if i == 1` instead of `if (i == 1)`.
+- Julia does not treat the numbers `0` and `1` as Booleans. You cannot write `if (1)` in Julia, because `if` statements accept only booleans. Instead, you can write `if true`, `if Bool(1)`, or `if 1==1`.
+- Julia does not provide `nrow` and `ncol`. Instead, use `size(M, 1)` for `nrow(M)` and `size(M, 2)` for `ncol(M)`.
+- Julia is careful to distinguish scalars, vectors and matrices. In R, `1` and `c(1)` are the same. In Julia, they cannot be used interchangeably.
+- Julia's [`diag`](../../stdlib/LinearAlgebra/#LinearAlgebra.diag) and [`diagm`](../../stdlib/LinearAlgebra/#LinearAlgebra.diagm) are not like R's.
+- Julia cannot assign to the results of function calls on the left hand side of an assignment operation: you cannot write `diag(M) = fill(1, n)`.
+- Julia discourages populating the main namespace with functions. Most statistical functionality for Julia is found in [packages](https://pkg.julialang.org/) under the [JuliaStats organization](https://github.com/JuliaStats). For example:
+
+  - Functions pertaining to probability distributions are provided by the [Distributions package](https://github.com/JuliaStats/Distributions.jl).
+  - The [DataFrames package](https://github.com/JuliaData/DataFrames.jl) provides data frames.
+  - Generalized linear models are provided by the [GLM package](https://github.com/JuliaStats/GLM.jl).
+
+- Julia provides tuples and real hash tables, but not R-style lists. When returning multiple items, you should typically use a tuple or a named tuple: instead of `list(a = 1, b = 2)`, use `(1, 2)` or `(a=1, b=2)`.
+- Julia encourages users to write their own types, which are easier to use than S3 or S4 objects in R. Julia's multiple dispatch system means that `table(x::TypeA)` and `table(x::TypeB)` act like R's `table.TypeA(x)` and `table.TypeB(x)`.
+- In Julia, values are not copied when assigned or passed to a function. If a function modifies an array, the changes will be visible in the caller. This is very different from R and allows new functions to operate on large data structures much more efficiently.
+- In Julia, vectors and matrices are concatenated using [`hcat`](../../base/arrays/#Base.hcat), [`vcat`](../../base/arrays/#Base.vcat) and [`hvcat`](../../base/arrays/#Base.hvcat), not `c`, `rbind` and `cbind` like in R.
+- In Julia, a range like `a:b` is not shorthand for a vector like in R, but is a specialized `AbstractRange` object that is used for iteration. To convert a range into a vector, use [`collect(a:b)`](../../base/collections/#Base.collect-Tuple{Any}).
+- The `:` operator has a different precedence in R and Julia. In particular, in Julia arithmetic operators have higher precedence than the `:` operator, whereas the reverse is true in R. For example, `1:n-1` in Julia is equivalent to `1:(n-1)` in R.
+- Julia's [`max`](../../base/math/#Base.max) and [`min`](../../base/math/#Base.min) are the equivalent of `pmax` and `pmin` respectively in R, but both arguments need to have the same dimensions. While [`maximum`](../../base/collections/#Base.maximum) and [`minimum`](../../base/collections/#Base.minimum) replace `max` and `min` in R, there are important differences.
+- Julia's [`sum`](../../base/collections/#Base.sum), [`prod`](../../base/collections/#Base.prod), [`maximum`](../../base/collections/#Base.maximum), and [`minimum`](../../base/collections/#Base.minimum) are different from their counterparts in R. They all accept an optional keyword argument `dims`, which indicates the dimensions, over which the operation is carried out. For instance, let `A = [1 2; 3 4]` in Julia and `B <- rbind(c(1,2),c(3,4))` be the same matrix in R. Then `sum(A)` gives the same result as `sum(B)`, but `sum(A, dims=1)` is a row vector containing the sum over each column and `sum(A, dims=2)` is a column vector containing the sum over each row. This contrasts to the behavior of R, where separate `colSums(B)` and `rowSums(B)` functions provide these functionalities. If the `dims` keyword argument is a vector, then it specifies all the dimensions over which the sum is performed, while retaining the dimensions of the summed array, e.g. `sum(A, dims=(1,2)) == hcat(10)`. It should be noted that there is no error checking regarding the second argument.
+- Julia has several functions that can mutate their arguments. For example, it has both [`sort`](../../base/sort/#Base.sort) and [`sort!`](../../base/sort/#Base.sort!).
+- In R, performance requires vectorization. In Julia, almost the opposite is true: the best performing code is often achieved by using devectorized loops.
+- Julia is eagerly evaluated and does not support R-style lazy evaluation. For most users, this means that there are very few unquoted expressions or column names.
+- Julia does not support the `NULL` type. The closest equivalent is [`nothing`](../../base/constants/#Core.nothing), but it behaves like a scalar value rather than like a list. Use `x === nothing` instead of `is.null(x)`.
+- In Julia, missing values are represented by the [`missing`](../missing/#missing) object rather than by `NA`. Use [`ismissing(x)`](../../base/base/#Base.ismissing) (or `ismissing.(x)` for element-wise operation on vectors) instead of `is.na(x)`. The [`skipmissing`](../../base/base/#Base.skipmissing) function is generally used instead of `na.rm=TRUE` (though in some particular cases functions take a `skipmissing` argument).
+- Julia lacks the equivalent of R's `assign` or `get`.
+- In Julia, `return` does not require parentheses.
+- In R, an idiomatic way to remove unwanted values is to use logical indexing, like in the expression `x[x>3]` or in the statement `x = x[x>3]` to modify `x` in-place. In contrast, Julia provides the higher order functions [`filter`](../../base/collections/#Base.filter) and [`filter!`](../../base/collections/#Base.filter!), allowing users to write `filter(z->z>3, x)` and `filter!(z->z>3, x)` as alternatives to the corresponding transliterations `x[x.>3]` and `x = x[x.>3]`. Using [`filter!`](../../base/collections/#Base.filter!) reduces the use of temporary arrays.
+
+## [Noteworthy differences from Python](#Noteworthy-differences-from-Python)[](#Noteworthy-differences-from-Python "Permalink")
+
+- Julia's `for`, `if`, `while`, etc. blocks are terminated by the `end` keyword. Indentation level is not significant as it is in Python. Unlike Python, Julia has no `pass` keyword.
+- Strings are denoted by double quotation marks (`"text"`) in Julia (with three double quotation marks for multi-line strings), whereas in Python they can be denoted either by single (`'text'`) or double quotation marks (`"text"`). Single quotation marks are used for characters in Julia (`'c'`).
+- String concatenation is done with `*` in Julia, not `+` like in Python. Analogously, string repetition is done with `^`, not `*`. Implicit string concatenation of string literals like in Python (e.g. `'ab' 'cd' == 'abcd'`) is not done in Julia.
+- Python Lists—flexible but slow—correspond to the Julia `Vector{Any}` type or more generally `Vector{T}` where `T` is some non-concrete element type. "Fast" arrays like NumPy arrays that store elements in-place (i.e., `dtype` is `np.float64`, `[('f1', np.uint64), ('f2', np.int32)]`, etc.) can be represented by `Array{T}` where `T` is a concrete, immutable element type. This includes built-in types like `Float64`, `Int32`, `Int64` but also more complex types like `Tuple{UInt64,Float64}` and many user-defined types as well.
+- In Julia, indexing of arrays, strings, etc. is 1-based not 0-based.
+- Julia's slice indexing includes the last element, unlike in Python. `a[2:3]` in Julia is `a[1:3]` in Python.
+- Unlike Python, Julia allows [AbstractArrays with arbitrary indexes](https://julialang.org/blog/2017/04/offset-arrays/). Python's special interpretation of negative indexing, `a[-1]` and `a[-2]`, should be written `a[end]` and `a[end-1]` in Julia.
+- Julia requires `end` for indexing until the last element. `x[1:]` in Python is equivalent to `x[2:end]` in Julia.
+- In Julia, `:` before any object creates a [`Symbol`](../../base/base/#Core.Symbol) or _quotes_ an expression; so, `x[:5]` is same as `x[5]`. If you want to get the first `n` elements of an array, then use range indexing.
+- Julia's range indexing has the format of `x[start:step:stop]`, whereas Python's format is `x[start:(stop+1):step]`. Hence, `x[0:10:2]` in Python is equivalent to `x[1:2:10]` in Julia. Similarly, `x[::-1]` in Python, which refers to the reversed array, is equivalent to `x[end:-1:1]` in Julia.
+- In Julia, ranges can be constructed independently as `start:step:stop`, the same syntax it uses in array-indexing. The `range` function is also supported.
+- In Julia, indexing a matrix with arrays like `X[[1,2], [1,3]]` refers to a sub-matrix that contains the intersections of the first and second rows with the first and third columns. In Python, `X[[1,2], [1,3]]` refers to a vector that contains the values of cell `[1,1]` and `[2,3]` in the matrix. `X[[1,2], [1,3]]` in Julia is equivalent with `X[np.ix_([0,1],[0,2])]` in Python. `X[[0,1], [0,2]]` in Python is equivalent with `X[[CartesianIndex(1,1), CartesianIndex(2,3)]]` in Julia.
+- Julia has no line continuation syntax: if, at the end of a line, the input so far is a complete expression, it is considered done; otherwise the input continues. One way to force an expression to continue is to wrap it in parentheses.
+- Julia arrays are column-major (Fortran-ordered) whereas NumPy arrays are row-major (C-ordered) by default. To get optimal performance when looping over arrays, the order of the loops should be reversed in Julia relative to NumPy (see [relevant section of Performance Tips](../performance-tips/#man-performance-column-major)).
+- Julia's updating operators (e.g. `+=`, `-=`, ...) are _not in-place_ whereas NumPy's are. This means `A = [1, 1]; B = A; B += [3, 3]` doesn't change values in `A`, it rather rebinds the name `B` to the result of the right-hand side `B = B + 3`, which is a new array. For in-place operation, use `B .+= 3` (see also [dot operators](../mathematical-operations/#man-dot-operators)), explicit loops, or `InplaceOps.jl`.
+- Julia evaluates default values of function arguments every time the method is invoked, unlike in Python where the default values are evaluated only once when the function is defined. For example, the function `f(x=rand()) = x` returns a new random number every time it is invoked without argument. On the other hand, the function `g(x=[1,2]) = push!(x,3)` returns `[1,2,3]` every time it is called as `g()`.
+- In Julia, keyword arguments must be passed using keywords, unlike Python in which it is usually possible to pass them positionally. Attempting to pass a keyword argument positionally alters the method signature leading to a `MethodError` or calling of the wrong method.
+- In Julia `%` is the remainder operator, whereas in Python it is the modulus.
+- In Julia, the commonly used `Int` type corresponds to the machine integer type (`Int32` or `Int64`), unlike in Python, where `int` is an arbitrary length integer. This means in Julia the `Int` type will overflow, such that `2^64 == 0`. If you need larger values use another appropriate type, such as `Int128`, [`BigInt`](../../base/numbers/#Base.GMP.BigInt) or a floating point type like `Float64`.
+- The imaginary unit `sqrt(-1)` is represented in Julia as `im`, not `j` as in Python.
+- In Julia, the exponentiation operator is `^`, not `**` as in Python.
+- Julia uses `nothing` of type `Nothing` to represent a null value, whereas Python uses `None` of type `NoneType`.
+- In Julia, the standard operators over a matrix type are matrix operations, whereas, in Python, the standard operators are element-wise operations. When both `A` and `B` are matrices, `A * B` in Julia performs matrix multiplication, not element-wise multiplication as in Python. `A * B` in Julia is equivalent with `A @ B` in Python, whereas `A * B` in Python is equivalent with `A .* B` in Julia.
+- The adjoint operator `'` in Julia returns an adjoint of a vector (a lazy representation of row vector), whereas the transpose operator `.T` over a vector in Python returns the original vector (non-op).
+- In Julia, a function may contain multiple concrete implementations (called _methods_), which are selected via multiple dispatch based on the types of all arguments to the call, as compared to functions in Python, which have a single implementation and no polymorphism (as opposed to Python method calls which use a different syntax and allows dispatch on the receiver of the method).
+- There are no classes in Julia. Instead there are structures (mutable or immutable), containing data but no methods.
+- Calling a method of a class instance in Python (`x = MyClass(*args); x.f(y)`) corresponds to a function call in Julia, e.g. `x = MyType(args...); f(x, y)`. In general, multiple dispatch is more flexible and powerful than the Python class system.
+- Julia structures may have exactly one abstract supertype, whereas Python classes can inherit from one or more (abstract or concrete) superclasses.
+- The logical Julia program structure (Packages and Modules) is independent of the file structure, whereas the Python code structure is defined by directories (Packages) and files (Modules).
+- In Julia, it is idiomatic to split the text of large modules into multiple files, without introducing a new module per file. The code is reassembled inside a single module in a main file via `include`. While the Python equivalent (`exec`) is not typical for this use (it will silently clobber prior definitions), Julia programs are defined as a unit at the `module` level with `using` or `import`, which will only get executed once when first needed–like `include` in Python. Within those modules, the individual files that make up that module are loaded with `include` by listing them once in the intended order.
+- The ternary operator `x > 0 ? 1 : -1` in Julia corresponds to a conditional expression in Python `1 if x > 0 else -1`.
+- In Julia the `@` symbol refers to a macro, whereas in Python it refers to a decorator.
+- Exception handling in Julia is done using `try` — `catch` — `finally`, instead of `try` — `except` — `finally`. In contrast to Python, it is not recommended to use exception handling as part of the normal workflow in Julia (compared with Python, Julia is faster at ordinary control flow but slower at exception-catching).
+- In Julia loops are fast, there is no need to write "vectorized" code for performance reasons.
+- Be careful with non-constant global variables in Julia, especially in tight loops. Since you can write close-to-metal code in Julia (unlike Python), the effect of globals can be drastic (see [Performance Tips](../performance-tips/#man-performance-tips)).
+- In Julia, rounding and truncation are explicit. Python's `int(3.7)` should be `floor(Int, 3.7)` or `Int(floor(3.7))` and is distinguished from `round(Int, 3.7)`. `floor(x)` and `round(x)` on their own return an integer value of the same type as `x` rather than always returning `Int`.
+- In Julia, parsing is explicit. Python's `float("3.7")` would be `parse(Float64, "3.7")` in Julia.
+- In Python, the majority of values can be used in logical contexts (e.g. `if "a":` means the following block is executed, and `if "":` means it is not). In Julia, you need explicit conversion to `Bool` (e.g. `if "a"` throws an exception). If you want to test for a non-empty string in Julia, you would explicitly write `if !isempty("")`. Perhaps surprisingly, in Python `if "False"` and `bool("False")` both evaluate to `True` (because `"False"` is a non-empty string); in Julia, `parse(Bool, "false")` returns `false`.
+- In Julia, a new local scope is introduced by most code blocks, including loops and `try` — `catch` — `finally`. Note that comprehensions (list, generator, etc.) introduce a new local scope both in Python and Julia, whereas `if` blocks do not introduce a new local scope in both languages.
+
+## [Noteworthy differences from C/C++](#Noteworthy-differences-from-C/C)[](#Noteworthy-differences-from-C/C "Permalink")
+
+- Julia arrays are indexed with square brackets, and can have more than one dimension `A[i,j]`. This syntax is not just syntactic sugar for a reference to a pointer or address as in C/C++. See [the manual entry about array construction](../arrays/#man-multi-dim-arrays).
+- In Julia, indexing of arrays, strings, etc. is 1-based not 0-based.
+- Julia arrays are not copied when assigned to another variable. After `A = B`, changing elements of `B` will modify `A` as well. Updating operators like `+=` do not operate in-place, they are equivalent to `A = A + B` which rebinds the left-hand side to the result of the right-hand side expression.
+- Julia arrays are column major (Fortran ordered) whereas C/C++ arrays are row major ordered by default. To get optimal performance when looping over arrays, the order of the loops should be reversed in Julia relative to C/C++ (see [relevant section of Performance Tips](../performance-tips/#man-performance-column-major)).
+- Julia values are not copied when assigned or passed to a function. If a function modifies an array, the changes will be visible in the caller.
+- In Julia, whitespace is significant, unlike C/C++, so care must be taken when adding/removing whitespace from a Julia program.
+- In Julia, literal numbers without a decimal point (such as `42`) create signed integers, of type `Int`, but literals too large to fit in the machine word size will automatically be promoted to a larger size type, such as `Int64` (if `Int` is `Int32`), `Int128`, or the arbitrarily large `BigInt` type. There are no numeric literal suffixes, such as `L`, `LL`, `U`, `UL`, `ULL` to indicate unsigned and/or signed vs. unsigned. Decimal literals are always signed, and hexadecimal literals (which start with `0x` like C/C++), are unsigned, unless when they encode more than 128 bits, in which case they are of type `BigInt`. Hexadecimal literals also, unlike C/C++/Java and unlike decimal literals in Julia, have a type based on the _length_ of the literal, including leading 0s. For example, `0x0` and `0x00` have type [`UInt8`](../../base/numbers/#Core.UInt8), `0x000` and `0x0000` have type [`UInt16`](../../base/numbers/#Core.UInt16), then literals with 5 to 8 hex digits have type `UInt32`, 9 to 16 hex digits type `UInt64`, 17 to 32 hex digits type `UInt128`, and more that 32 hex digits type `BigInt`. This needs to be taken into account when defining hexadecimal masks, for example `~0xf == 0xf0` is very different from `~0x000f == 0xfff0`. 64 bit `Float64` and 32 bit [`Float32`](../../base/numbers/#Core.Float32) bit literals are expressed as `1.0` and `1.0f0` respectively. Floating point literals are rounded (and not promoted to the `BigFloat` type) if they can not be exactly represented. Floating point literals are closer in behavior to C/C++. Octal (prefixed with `0o`) and binary (prefixed with `0b`) literals are also treated as unsigned (or `BigInt` for more than 128 bits).
+- In Julia, the division operator [`/`](../../base/math/#Base.:/) returns a floating point number when both operands are of integer type. To perform integer division, use [`div`](../../base/math/#Base.div) or [`÷`](../../base/math/#Base.div).
+- Indexing an `Array` with floating point types is generally an error in Julia. The Julia equivalent of the C expression `a[i / 2]` is `a[i ÷ 2 + 1]`, where `i` is of integer type.
+- String literals can be delimited with either `"` or `"""`, `"""` delimited literals can contain `"` characters without quoting it like `"\""`. String literals can have values of other variables or expressions interpolated into them, indicated by `$variablename` or `$(expression)`, which evaluates the variable name or the expression in the context of the function.
+- `//` indicates a [`Rational`](../../base/numbers/#Base.Rational) number, and not a single-line comment (which is `#` in Julia)
+- `#=` indicates the start of a multiline comment, and `=#` ends it.
+- Functions in Julia return values from their last expression(s) or the `return` keyword. Multiple values can be returned from functions and assigned as tuples, e.g. `(a, b) = myfunction()` or `a, b = myfunction()`, instead of having to pass pointers to values as one would have to do in C/C++ (i.e. `a = myfunction(&b)`.
+- Julia does not require the use of semicolons to end statements. The results of expressions are not automatically printed (except at the interactive prompt, i.e. the REPL), and lines of code do not need to end with semicolons. [`println`](../../base/io-network/#Base.println) or [`@printf`](../../stdlib/Printf/#Printf.@printf) can be used to print specific output. In the REPL, `;` can be used to suppress output. `;` also has a different meaning within `[ ]`, something to watch out for. `;` can be used to separate expressions on a single line, but are not strictly necessary in many cases, and are more an aid to readability.
+- In Julia, the operator [`⊻`](../../base/math/#Base.xor) ([`xor`](../../base/math/#Base.xor)) performs the bitwise XOR operation, i.e. [`^`](../../base/math/#Base.:^-Tuple{Number, Number}) in C/C++. Also, the bitwise operators do not have the same precedence as C/C++, so parenthesis may be required.
+- Julia's [`^`](../../base/math/#Base.:^-Tuple{Number, Number}) is exponentiation (pow), not bitwise XOR as in C/C++ (use [`⊻`](../../base/math/#Base.xor), or [`xor`](../../base/math/#Base.xor), in Julia)
+- Julia has two right-shift operators, `>>` and `>>>`. `>>` performs an arithmetic shift, `>>>` always performs a logical shift, unlike C/C++, where the meaning of `>>` depends on the type of the value being shifted.
+- Julia's `->` creates an anonymous function, it does not access a member via a pointer.
+- Julia does not require parentheses when writing `if` statements or `for`/`while` loops: use `for i in [1, 2, 3]` instead of `for (int i=1; i <= 3; i++)` and `if i == 1` instead of `if (i == 1)`.
+- Julia does not treat the numbers `0` and `1` as Booleans. You cannot write `if (1)` in Julia, because `if` statements accept only booleans. Instead, you can write `if true`, `if Bool(1)`, or `if 1==1`.
+- Julia uses `end` to denote the end of conditional blocks, like `if`, loop blocks, like `while`/ `for`, and functions. In lieu of the one-line `if ( cond ) statement`, Julia allows statements of the form `if cond; statement; end`, `cond && statement` and `!cond || statement`. Assignment statements in the latter two syntaxes must be explicitly wrapped in parentheses, e.g. `cond && (x = value)`, because of the operator precedence.
+- Julia has no line continuation syntax: if, at the end of a line, the input so far is a complete expression, it is considered done; otherwise the input continues. One way to force an expression to continue is to wrap it in parentheses.
+- Julia macros operate on parsed expressions, rather than the text of the program, which allows them to perform sophisticated transformations of Julia code. Macro names start with the `@` character, and have both a function-like syntax, `@mymacro(arg1, arg2, arg3)`, and a statement-like syntax, `@mymacro arg1 arg2 arg3`. The forms are interchangeable; the function-like form is particularly useful if the macro appears within another expression, and is often clearest. The statement-like form is often used to annotate blocks, as in the distributed `for` construct: `@distributed for i in 1:n; #= body =#; end`. Where the end of the macro construct may be unclear, use the function-like form.
+- Julia has an enumeration type, expressed using the macro `@enum(name, value1, value2, ...)` For example: `@enum(Fruit, banana=1, apple, pear)`
+- By convention, functions that modify their arguments have a `!` at the end of the name, for example `push!`.
+- In C++, by default, you have static dispatch, i.e. you need to annotate a function as virtual, in order to have dynamic dispatch. On the other hand, in Julia every method is "virtual" (although it's more general than that since methods are dispatched on every argument type, not only `this`, using the most-specific-declaration rule).
+
+### [Julia ⇔ C/C++: Namespaces](#Julia-C/C:-Namespaces)[](#Julia-C/C:-Namespaces "Permalink")
+
+- C/C++ `namespace`s correspond roughly to Julia `module`s.
+- There are no private globals or fields in Julia. Everything is publicly accessible through fully qualified paths (or relative paths, if desired).
+- `using MyNamespace::myfun` (C++) corresponds roughly to `import MyModule: myfun` (Julia).
+- `using namespace MyNamespace` (C++) corresponds roughly to `using MyModule` (Julia)
+  - In Julia, only `export`ed symbols are made available to the calling module.
+  - In C++, only elements found in the included (public) header files are made available.
+- Caveat: `import`/`using` keywords (Julia) also _load_ modules (see below).
+- Caveat: `import`/`using` (Julia) works only at the global scope level (`module`s)
+  - In C++, `using namespace X` works within arbitrary scopes (ex: function scope).
+
+### [Julia ⇔ C/C++: Module loading](#Julia-C/C:-Module-loading)[](#Julia-C/C:-Module-loading "Permalink")
+
+- When you think of a C/C++ "**library**", you are likely looking for a Julia "**package**".
+  - Caveat: C/C++ libraries often house multiple "software modules" whereas Julia "packages" typically house one.
+  - Reminder: Julia `module`s are global scopes (not necessarily "software modules").
+- **Instead of build/`make` scripts**, Julia uses "Project Environments" (sometimes called either "Project" or "Environment").
+  - Build scripts are only needed for more complex applications (like those needing to compile or download C/C++ executables).
+  - To develop application or project in Julia, you can initialize its root directory as a "Project Environment", and house application-specific code/packages there. This provides good control over project dependencies, and future reproducibility.
+  - Available packages are added to a "Project Environment" with the `Pkg.add()` function or Pkg REPL mode. (This does not **load** said package, however).
+  - The list of available packages (direct dependencies) for a "Project Environment" are saved in its `Project.toml` file.
+  - The _full_ dependency information for a "Project Environment" is auto-generated & saved in its `Manifest.toml` file by `Pkg.resolve()`.
+- Packages ("software modules") available to the "Project Environment" are loaded with `import` or `using`.
+  - In C/C++, you `#include <moduleheader>` to get object/function declarations, and link in libraries when you build the executable.
+  - In Julia, calling using/import again just brings the existing module into scope, but does not load it again (similar to adding the non-standard `#pragma once` to C/C++).
+- **Directory-based package repositories** (Julia) can be made available by adding repository paths to the `Base.LOAD_PATH` array.
+  - Packages from directory-based repositories do not require the `Pkg.add()` tool prior to being loaded with `import` or `using`. They are simply available to the project.
+  - Directory-based package repositories are the **quickest solution** to developing local libraries of "software modules".
+
+### [Julia ⇔ C/C++: Assembling modules](#Julia-C/C:-Assembling-modules)[](#Julia-C/C:-Assembling-modules "Permalink")
+
+- In C/C++, `.c`/`.cpp` files are compiled & added to a library with build/`make` scripts.
+  - In Julia, `import [PkgName]`/`using [PkgName]` statements load `[PkgName].jl` located in a package's `[PkgName]/src/` subdirectory.
+  - In turn, `[PkgName].jl` typically loads associated source files with calls to `include "[someotherfile].jl"`.
+- `include "./path/to/somefile.jl"` (Julia) is very similar to `#include "./path/to/somefile.jl"` (C/C++).
+  - However `include "..."` (Julia) is not used to include header files (not required).
+  - **Do not use** `include "..."` (Julia) to load code from other "software modules" (use `import`/`using` instead).
+  - `include "path/to/some/module.jl"` (Julia) would instantiate multiple versions of the same code in different modules (creating _distinct_ types (etc.) with the _same_ names).
+  - `include "somefile.jl"` is typically used to assemble multiple files _within the same Julia package_ ("software module"). It is therefore relatively straightforward to ensure file are `include`d only once (No `#ifdef` confusion).
+
+### [Julia ⇔ C/C++: Module interface](#Julia-C/C:-Module-interface)[](#Julia-C/C:-Module-interface "Permalink")
+
+- C++ exposes interfaces using "public" `.h`/`.hpp` files whereas Julia `module`s mark specific symbols that are intended for their users as `public`or `export`ed.
+  - Often, Julia `module`s simply add functionality by generating new "methods" to existing functions (ex: `Base.push!`).
+  - Developers of Julia packages therefore cannot rely on header files for interface documentation.
+  - Interfaces for Julia packages are typically described using docstrings, README.md, static web pages, ...
+- Some developers choose not to `export` all symbols required to use their package/module, but should still mark unexported user facing symbols as `public`.
+  - Users might be expected to access these components by qualifying functions/structs/... with the package/module name (ex: `MyModule.run_this_task(...)`).
+
+### [Julia ⇔ C/C++: Quick reference](#Julia-C/C:-Quick-reference)[](#Julia-C/C:-Quick-reference "Permalink")
+
+Software Concept
+
+Julia
+
+C/C++
+
+unnamed scope
+
+`begin` ... `end`
+
+`{` ... `}`
+
+function scope
+
+`function x()` ... `end`
+
+`int x() {` ... `}`
+
+global scope
+
+`module MyMod` ... `end`
+
+`namespace MyNS {` ... `}`
+
+software module
+
+A Julia "package"
+
+`.h`/`.hpp` files<br>+compiled `somelib.a`
+
+assembling<br>software modules
+
+`SomePkg.jl`: ...<br>`import("subfile1.jl")`<br>`import("subfile2.jl")`<br>...
+
+`$(AR) *.o` &rArr; `somelib.a`
+
+import<br>software module
+
+`import SomePkg`
+
+`#include <somelib>`<br>+link in `somelib.a`
+
+module library
+
+`LOAD_PATH[]`, \*Git repository,<br>\*\*custom package registry
+
+more `.h`/`.hpp` files<br>+bigger compiled `somebiglib.a`
+
+\* The Julia package manager supports registering multiple packages from a single Git repository.<br> \* This allows users to house a library of related packages in a single repository.<br> \*\* Julia registries are primarily designed to provide versioning \\& distribution of packages.<br> \*\* Custom package registries can be used to create a type of module library.
+
+## [Noteworthy differences from Common Lisp](#Noteworthy-differences-from-Common-Lisp)[](#Noteworthy-differences-from-Common-Lisp "Permalink")
 
 - Julia uses 1-based indexing for arrays by default, and it can also handle arbitrary [index offsets](../../devdocs/offset-arrays/#man-custom-indices).
 - Functions and variables share the same namespace (“Lisp-1”).
@@ -7414,184 +8090,6 @@ jobs:
 """
 ```
 
-### Package Development and Testing
-
-#### PkgTemplates: Creating Julia Packages
-
-Julia packages are best started and cloned from within Julia itself. PkgTemplates provides a standardized way to create new packages with proper structure and CI/CD setup.
-
-```julia
-using PkgTemplates
-
-# Recommended template for course projects
-tpl = Template(; plugins=[
-    GitHubActions(),      # Sets up CI/CD on GitHub
-    Codecov(),           # Code coverage reporting
-    Documenter{GitHubActions}()  # Documentation generation
-])
-
-# Create a new package
-tpl("MyPackage")
-```
-
-#### What PkgTemplates Sets Up:
-
-- **`GitHubActions()`**: Creates `.github/workflows/CI.yml` for automated testing
-- **`Codecov()`**: Configures code coverage reporting to CodeCov service
-- **`Documenter{GitHubActions}()`**: Sets up `docs/` folder for documentation
-
-#### Package Management with Pkg
-
-```julia
-# Pkg allows distinguishing between dependencies and test dependencies
-# Use the [extras] section of Project.toml for test-only packages
-
-# Example Project.toml structure:
-[deps]
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-ReferenceTests = "324d217c-45ce-50fc-8251-dcbf6b42a3a0"
-
-[targets]
-test = ["Test", "ReferenceTests"]
-```
-
-#### Pkg.test vs include("runtests.jl")
-
-```julia
-# Pkg.test runs tests in a clean environment
-Pkg.test("MyPackage")  # Decoupled from your current environment
-
-# include("runtests.jl") runs in current environment
-include("runtests.jl")  # Uses whatever packages are currently loaded
-
-# TestEnv.jl for Revise-compatible testing
-using TestEnv
-TestEnv.activate("MyPackage")  # Replicates test environment in REPL
-```
-
-#### Test-Driven Development (TDD) in Julia
-
-TDD is a development methodology where you write tests before implementing code. This approach helps ensure code quality and guides design decisions.
-
-```julia
-# 1. Write a failing test first
-@testset "MyFunction tests" begin
-    @test my_function(2) == 4  # This will fail initially
-end
-
-# 2. Write minimal implementation to pass the test
-function my_function(x)
-    return x * 2  # Minimal implementation
-end
-
-# 3. Refactor and improve
-function my_function(x)
-    return 2x  # Improved implementation
-end
-```
-
-#### Using Revise with TDD
-
-```julia
-# Revise helps with the TDD workflow by automatically reloading code changes
-using Revise
-
-# Workflow for debugging with Revise:
-# 1. Check out a branch and commit your candidate test
-# 2. Stash the fix: git stash push -m "candidate fix"
-# 3. Run test and verify it fails
-# 4. Pop the stash: git stash pop
-# 5. Run test and verify it passes
-```
-
-#### Code Coverage with CodeCov
-
-Code coverage measures the fraction of source code lines that get "exercised" by your tests.
-
-```julia
-# 1. Log in to CodeCov via GitHub account
-# 2. Grant access to your repositories
-# 3. PkgTemplates automatically configures CodeCov integration
-
-# Local coverage measurement
-# julia --code-coverage=user test/runtests.jl
-
-# Using Coverage.jl for local analysis
-using Coverage
-coverage = process_folder()  # Analyze coverage data
-```
-
-#### Continuous Integration (CI) with GitHub Actions
-
-GitHub Actions provides automated testing and deployment for Julia packages.
-
-```yaml
-# .github/workflows/CI.yml (auto-generated by PkgTemplates)
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        julia-version: ["1.6", "1.8", "1.9"]
-        julia-arch: [x64]
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v1
-      - run: |
-          julia --project=. -e 'using Pkg; Pkg.test(coverage=true)'
-      - uses: julia-actions/upload-artifact@v1
-        if: failure()
-```
-
-#### Advanced Testing Patterns
-
-```julia
-# Reference tests (for output comparison)
-using ReferenceTests
-@test_reference "references/plot1.txt" generate_plot()
-
-# Property-based testing
-using Test
-@test all(x -> my_function(x) > 0, 1:10)
-
-# Performance testing
-using BenchmarkTools
-@btime my_function(100)
-```
-
-#### Test Organization Best Practices
-
-```julia
-# test/runtests.jl
-using Test
-using MyPackage
-
-# Include test files
-include("test_basic.jl")
-include("test_advanced.jl")
-
-# Test structure
-@testset "Basic functionality" begin
-    @test my_function(1) == 2
-    @test my_function(0) == 0
-end
-
-@testset "Edge cases" begin
-    @test_throws ArgumentError my_function(-1)
-end
-```
-
-````
-
 ---
 
 ```julia
@@ -7600,7 +8098,7 @@ end
     r = 2:4
     @test isa(r, AbstractUnitRange) && first(r) == 2 && last(r) == 5
 end
-````
+```
 
 ```
 julia /Users/markpampuch/to-learn_offline/julia/AdvancedScientificComputing/homeworks/learning_julia1_exercises.jl
@@ -8944,9 +9442,9 @@ The Julia extension for VSCode provides excellent IDE support for Julia developm
 
 ---
 
-## Documentation and Help
+## Help Resources
 
-Julia provides extensive help and documentation resources, both built-in and through external tools.
+Julia provides extensive help and documentation resources.
 
 ### Built-in Help
 
@@ -9031,9 +9529,7 @@ names(Base)                 # List all exported names from Base
 names(SparseArrays)         # List all exported names from SparseArrays
 ```
 
-### Documentation Tools and Features
-
-#### VSCode Integration
+### VSCode Integration
 
 ```julia
 # 1. Hover Documentation
@@ -9047,21 +9543,6 @@ names(SparseArrays)         # List all exported names from SparseArrays
 
 # 4. Find References
 # Find all usages of a function or variable
-```
-
-#### Pluto Notebooks
-
-```julia
-# 1. Live Documentation
-# Hover over functions to see documentation
-# Use ?function_name for help
-
-# 2. Markdown Documentation
-# Use markdown cells for documentation
-# Explain your code and results
-
-# 3. Export Options
-# Export to HTML, PDF, or other formats
 ```
 
 ### Online Resources
@@ -9098,6 +9579,412 @@ names(SparseArrays)         # List all exported names from SparseArrays
 
 # 4. Workshops and Conferences
 # JuliaCon and local meetups
+```
+
+---
+
+## Package Development and Testing in Julia
+
+### PkgTemplates: Creating Julia Packages
+
+Julia packages are best started and cloned from within Julia itself. PkgTemplates provides a standardized way to create new packages with proper structure and CI/CD setup.
+
+```julia
+using PkgTemplates
+
+# Recommended template for course projects
+tpl = Template(; plugins=[
+    GitHubActions(),      # Sets up CI/CD on GitHub
+    Codecov(),           # Code coverage reporting
+    Documenter{GitHubActions}()  # Documentation generation
+])
+
+# Create a new package
+tpl("MyPackage")
+```
+
+#### What PkgTemplates Sets Up:
+
+- **`GitHubActions()`**: Creates `.github/workflows/CI.yml` for automated testing
+- **`Codecov()`**: Configures code coverage reporting to CodeCov service
+- **`Documenter{GitHubActions}()`**: Sets up `docs/` folder for documentation
+
+### Package Management with Pkg
+
+```julia
+# Pkg allows distinguishing between dependencies and test dependencies
+# Use the [extras] section of Project.toml for test-only packages
+
+# Example Project.toml structure:
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+ReferenceTests = "324d217c-45ce-50fc-8251-dcbf6b42a3a0"
+
+[targets]
+test = ["Test", "ReferenceTests"]
+```
+
+#### Pkg.test vs include("runtests.jl")
+
+```julia
+# Pkg.test runs tests in a clean environment
+Pkg.test("MyPackage")  # Decoupled from your current environment
+
+# include("runtests.jl") runs in current environment
+include("runtests.jl")  # Uses whatever packages are currently loaded
+
+# TestEnv.jl for Revise-compatible testing
+using TestEnv
+TestEnv.activate("MyPackage")  # Replicates test environment in REPL
+```
+
+### Test-Driven Development (TDD) in Julia
+
+TDD is a development methodology where you write tests before implementing code. This approach helps ensure code quality and guides design decisions.
+
+#### TDD Workflow
+
+```julia
+# 1. Write a failing test first
+@testset "MyFunction tests" begin
+    @test my_function(2) == 4  # This will fail initially
+end
+
+# 2. Write minimal implementation to pass the test
+function my_function(x)
+    return x * 2  # Minimal implementation
+end
+
+# 3. Refactor and improve
+function my_function(x)
+    return 2x  # Improved implementation
+end
+```
+
+#### Using Revise with TDD
+
+```julia
+# Revise helps with the TDD workflow by automatically reloading code changes
+using Revise
+
+# Workflow for debugging with Revise:
+# 1. Check out a branch and commit your candidate test
+# 2. Stash the fix: git stash push -m "candidate fix"
+# 3. Run test and verify it fails
+# 4. Pop the stash: git stash pop
+# 5. Run test and verify it passes
+```
+
+### Code Coverage with CodeCov
+
+Code coverage measures the fraction of source code lines that get "exercised" by your tests.
+
+#### Setting Up CodeCov
+
+```julia
+# 1. Log in to CodeCov via GitHub account
+# 2. Grant access to your repositories
+# 3. PkgTemplates automatically configures CodeCov integration
+
+# Local coverage measurement
+# julia --code-coverage=user test/runtests.jl
+
+# Using Coverage.jl for local analysis
+using Coverage
+coverage = process_folder()  # Analyze coverage data
+```
+
+#### CodeCov Features
+
+- **Web-based coverage reports** with graphical representation
+- **GitHub integration** showing coverage in pull requests
+- **Line-by-line coverage** highlighting untested code
+- **Historical coverage tracking** over time
+
+### Continuous Integration (CI) with GitHub Actions
+
+GitHub Actions provides automated testing and deployment for Julia packages.
+
+#### Basic CI Workflow
+
+```yaml
+# .github/workflows/CI.yml (auto-generated by PkgTemplates)
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: ["1.6", "1.8", "1.9"]
+        julia-arch: [x64]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/cache@v1
+      - run: |
+          julia --project=. -e 'using Pkg; Pkg.test(coverage=true)'
+      - uses: julia-actions/upload-artifact@v1
+        if: failure()
+```
+
+#### CI Best Practices
+
+```julia
+# 1. Test on multiple Julia versions
+# 2. Test on multiple operating systems
+# 3. Include coverage reporting
+# 4. Cache dependencies for faster builds
+# 5. Use matrix builds for comprehensive testing
+```
+
+### Documentation with Documenter.jl
+
+Documenter.jl is the standard tool for creating documentation for Julia packages.
+
+#### Basic Documentation Setup
+
+```julia
+# docs/make.jl
+using Documenter
+using MyPackage
+
+makedocs(
+    sitename = "MyPackage",
+    format = Documenter.HTML(),
+    modules = [MyPackage],
+    pages = [
+        "Home" => "index.md",
+        "Tutorial" => "tutorial.md",
+        "Reference" => "reference.md"
+    ]
+)
+
+deploydocs(
+    repo = "github.com/username/MyPackage.jl.git",
+    target = "build",
+    push_preview = true
+)
+```
+
+#### Docstrings and Doctests
+
+````julia
+"""
+    my_function(x::Int)
+
+Compute the square of an integer.
+
+# Examples
+```jldoctest
+julia> my_function(3)
+9
+
+julia> my_function(-2)
+4
+````
+
+# Arguments
+
+- `x::Int`: The input integer
+
+# Returns
+
+- `Int`: The square of the input
+  """
+  function my_function(x::Int)
+  return x^2
+  end
+
+````
+
+#### Documentation Categories
+
+1. **Tutorials**: Step-by-step guides for beginners
+2. **How-to guides**: Solutions to specific problems
+3. **Reference**: Complete API documentation
+4. **Explanation**: Conceptual background and context
+
+### Semantic Versioning
+
+Julia packages follow semantic versioning (MAJOR.MINOR.PATCH):
+
+```julia
+# Project.toml
+version = "1.2.3"  # MAJOR=1, MINOR=2, PATCH=3
+
+# Version meaning:
+# MAJOR: Breaking changes (incompatible API changes)
+# MINOR: New features (backward compatible)
+# PATCH: Bug fixes (backward compatible)
+````
+
+#### Pre-1.0 Releases
+
+```julia
+# Before 1.0, breaking changes are allowed in MINOR versions
+# version = "0.5.0" can have breaking changes from "0.4.0"
+```
+
+### Dependency Management and Compatibility
+
+#### The `[compat]` Section
+
+```julia
+# Project.toml
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+
+[compat]
+DataFrames = "1.5"  # Accepts any 1.5.x version
+julia = "1.6"       # Requires Julia 1.6 or higher
+
+# Best practices:
+# - Use specific version ranges: "1.5" not ">= 1.5"
+# - Include upper bounds to prevent breakage
+# - Test with multiple versions when possible
+```
+
+#### Managing Dependencies
+
+```julia
+# Add dependencies
+Pkg.add("DataFrames")
+
+# Check what versions you're using
+Pkg.status()
+
+# Check for outdated packages
+Pkg.status(; outdated=true)
+
+# Update dependencies
+Pkg.update()
+```
+
+### Package Registration and Releases
+
+#### Making Releases
+
+```julia
+# 1. Bump version in Project.toml
+version = "1.2.4"
+
+# 2. Commit and push
+git add Project.toml
+git commit -m "Bump version to 1.2.4"
+git push
+
+# 3. TagBot automatically creates a release
+# 4. Registrator creates a PR to the General registry
+```
+
+#### TagBot and Registrator
+
+- **TagBot**: Automatically creates GitHub releases from tags
+- **Registrator**: Submits packages to Julia's General registry
+- **CompatHelper**: Keeps dependencies up to date
+
+### Testing Best Practices
+
+#### Test Organization
+
+```julia
+# test/runtests.jl
+using Test
+using MyPackage
+
+# Include test files
+include("test_basic.jl")
+include("test_advanced.jl")
+
+# Test structure
+@testset "Basic functionality" begin
+    @test my_function(1) == 2
+    @test my_function(0) == 0
+end
+
+@testset "Edge cases" begin
+    @test_throws ArgumentError my_function(-1)
+end
+```
+
+#### Test Types
+
+```julia
+# Unit tests
+@test my_function(2) == 4
+
+# Approximate equality
+@test my_function(π) ≈ 2π
+
+# Exception testing
+@test_throws ArgumentError my_function("invalid")
+
+# Type testing
+@test my_function(2) isa Float64
+
+# Boolean conditions
+@test iseven(my_function(2))
+```
+
+#### Advanced Testing
+
+```julia
+# Reference tests (for output comparison)
+using ReferenceTests
+@test_reference "references/plot1.txt" generate_plot()
+
+# Property-based testing
+using Test
+@test all(x -> my_function(x) > 0, 1:10)
+
+# Performance testing
+using BenchmarkTools
+@btime my_function(100)
+```
+
+### Development Workflow
+
+#### Recommended Workflow
+
+```julia
+# 1. Create package with PkgTemplates
+tpl = Template(; plugins=[GitHubActions(), Codecov(), Documenter{GitHubActions}()])
+tpl("MyPackage")
+
+# 2. Set up development environment
+cd("MyPackage")
+using Pkg
+Pkg.activate(".")
+
+# 3. Write tests first (TDD)
+# 4. Implement functionality
+# 5. Add documentation
+# 6. Run tests and check coverage
+# 7. Submit pull request
+# 8. Merge and release
+```
+
+#### Environment Management
+
+```julia
+# Create temporary environment for experimentation
+Pkg.activate("--temp")
+
+# Activate package environment
+Pkg.activate(".")
+
+# Develop package in current environment
+Pkg.develop(path="path/to/package")
+
+# Check environment status
+Pkg.status()
 ```
 
 ---
