@@ -9635,9 +9635,9 @@ The Julia extension for VSCode provides excellent IDE support for Julia developm
 
 ---
 
-## Help Resources
+## Documentation and Help
 
-Julia provides extensive help and documentation resources.
+Julia provides extensive help and documentation resources, both built-in and through external tools.
 
 ### Built-in Help
 
@@ -9722,7 +9722,9 @@ names(Base)                 # List all exported names from Base
 names(SparseArrays)         # List all exported names from SparseArrays
 ```
 
-### VSCode Integration
+### Documentation Tools and Features
+
+#### VSCode Integration
 
 ```julia
 # 1. Hover Documentation
@@ -9736,6 +9738,21 @@ names(SparseArrays)         # List all exported names from SparseArrays
 
 # 4. Find References
 # Find all usages of a function or variable
+```
+
+#### Pluto Notebooks
+
+```julia
+# 1. Live Documentation
+# Hover over functions to see documentation
+# Use ?function_name for help
+
+# 2. Markdown Documentation
+# Use markdown cells for documentation
+# Explain your code and results
+
+# 3. Export Options
+# Export to HTML, PDF, or other formats
 ```
 
 ### Online Resources
