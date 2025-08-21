@@ -1087,130 +1087,9 @@ push!(array_version, 1001)  # This requires a real array
 
 ---
 
-## Arrays in Julia
 
-Arrays in Julia are mutable, indexed collections that store values in contiguous memory. Unlike ranges, arrays actually store all their elements.
 
-### Basic Array Creation
 
-```julia
-# Create arrays with different syntax
-arr1 = [1, 2, 3, 4, 5]           # Vector{Int64}
-arr2 = [1.0, 2.0, 3.0]           # Vector{Float64}
-arr3 = [1, 2.0, "three"]         # Vector{Any} (heterogeneous)
-
-# Multi-dimensional arrays
-matrix = [1 2 3; 4 5 6]          # 2×3 Matrix{Int64}
-```
-
-### Converting Ranges to Arrays
-
-```julia
-# Create a range
-r = 2:5  # 2:5 (UnitRange{Int64})
-
-# Convert to array with collect()
-arr = collect(r)  # [2, 3, 4, 5]
-
-# The dot syntax for element-wise operations
-rf = Float64.(r)  # [2.0, 3.0, 4.0, 5.0]
-println(rf)
-```
-
-### Why `Float64.(r)` Works
-
-The dot syntax `Float64.(r)` is Julia's **broadcasting** syntax. Here's what happens:
-
-1. **Broadcasting**: The `.` operator applies `Float64` to each element of the range `r`
-2. **Element-wise conversion**: Each integer in the range gets converted to a `Float64`
-3. **Array creation**: The result is a new `Vector{Float64}` containing the converted values
-
-```julia
-# This is equivalent to:
-rf = [Float64(x) for x in r]
-
-# Or using map:
-rf = map(Float64, r)
-
-# The dot syntax is just syntactic sugar for broadcasting
-```
-
-### Broadcasting vs Regular Function Calls
-
-```julia
-r = 2:5
-
-# This doesn't work - Float64 expects a single value
-# Float64(r)  # Error!
-
-# This works - broadcasting applies Float64 to each element
-Float64.(r)  # [2.0, 3.0, 4.0, 5.0]
-
-# Other broadcasting examples
-r .+ 10      # [12, 13, 14, 15]  (add 10 to each element)
-r .* 2       # [4, 6, 8, 10]     (multiply each element by 2)
-r .^ 2       # [4, 9, 16, 25]    (square each element)
-```
-
-### Array Types and Memory
-
-```julia
-# Arrays have concrete types based on their elements
-arr_int = [1, 2, 3]
-typeof(arr_int)  # Vector{Int64}
-
-arr_float = [1.0, 2.0, 3.0]
-typeof(arr_float)  # Vector{Float64}
-
-# Memory usage depends on the number of elements
-sizeof(arr_int)    # 24 bytes (3 Int64s)
-sizeof(arr_float)  # 24 bytes (3 Float64s)
-
-# Compare with ranges (much smaller!)
-r = 1:3
-sizeof(r)  # 24 bytes (3 Int64s) - same as array, but scales differently
-```
-
-### Array Operations
-
-```julia
-arr = [1, 2, 3, 4, 5]
-
-# Indexing (1-based in Julia)
-arr[1]      # 1
-arr[end]    # 5
-arr[2:4]    # [2, 3, 4]
-
-# Mutability
-arr[1] = 10  # arr is now [10, 2, 3, 4, 5]
-
-# Adding/removing elements
-push!(arr, 6)     # [10, 2, 3, 4, 5, 6]
-pop!(arr)         # returns 6, arr is [10, 2, 3, 4, 5]
-```
-
-### When to Use Arrays vs Ranges
-
-```julia
-# Use ranges when:
-# - You need to iterate over a sequence
-# - Memory efficiency is important
-# - You're doing indexing operations
-for i in 1:1000
-    # work with i
-end
-
-# Use arrays when:
-# - You need to modify elements
-# - You need random access to elements
-# - You're passing to functions that expect arrays
-arr = [1, 2, 3, 4, 5]
-arr[3] = 10  # Can modify individual elements
-```
-
----
-
-## Creating Vectors of Specific Types
 
 Julia's type system allows you to create vectors with specific element types, which is crucial for performance and type safety.
 
@@ -7312,6 +7191,266 @@ B = rand(1000, 1000)
 
 ---
 
+## Data Structures
+
+Julia provides a rich set of data structures optimized for different use cases. Understanding when and how to use each type is crucial for writing efficient Julia code.
+
+### Arrays and Vectors
+
+Arrays in Julia are mutable, indexed collections that store values in contiguous memory. They are the most commonly used data structure for numerical computing and general-purpose collections.
+
+#### Basic Array Creation and Manipulation
+
+```julia
+# Create arrays with different syntax
+arr1 = [1, 2, 3, 4, 5]           # Vector{Int64}
+arr2 = [1.0, 2.0, 3.0]           # Vector{Float64}
+arr3 = ["a", "b", "c"]            # Vector{String}
+
+# Multi-dimensional arrays
+matrix = [1 2 3; 4 5 6; 7 8 9]   # 3x3 Matrix{Int64}
+array_3d = rand(2, 3, 4)         # 2x3x4 Array{Float64,3}
+```
+
+#### Type-Specific Vectors
+
+Julia's type system allows you to create vectors with specific element types, which is crucial for performance and type safety.
+
+```julia
+# Create typed vectors for better performance
+v1 = Vector{Int}(undef, 1000)     # Pre-allocated Int vector
+v2 = Vector{Float64}(undef, 1000) # Pre-allocated Float64 vector
+v3 = Vector{String}(undef, 100)   # Pre-allocated String vector
+
+# Type-specific vectors are more efficient
+@btime sum(Vector{Int}(1:1000))   # ~100 ns
+@btime sum(Vector{Any}(1:1000))   # ~10,000 ns (100x slower!)
+```
+
+#### Performance Considerations
+
+```julia
+# ✅ Good: Pre-allocate vectors for performance
+function fast_sum(n)
+    result = Vector{Int}(undef, n)
+    for i in 1:n
+        result[i] = i^2
+    end
+    return sum(result)
+end
+
+# ❌ Avoid: Growing vectors in loops
+function slow_sum(n)
+    result = Int[]
+    for i in 1:n
+        push!(result, i^2)  # Allocates new array each time
+    end
+    return sum(result)
+end
+```
+
+### Matrices
+
+Matrices are 2D arrays with specialized operations for linear algebra and scientific computing.
+
+#### Creation and Operations
+
+```julia
+# Create matrices
+A = [1 2 3; 4 5 6; 7 8 9]        # 3x3 matrix
+B = rand(3, 3)                   # Random 3x3 matrix
+I = Matrix(I, 3, 3)              # 3x3 identity matrix
+
+# Matrix operations
+C = A * B                         # Matrix multiplication
+D = A .* B                        # Element-wise multiplication
+E = A'                            # Transpose
+F = inv(A)                        # Matrix inverse
+```
+
+#### Memory Layout (Column-Major)
+
+Julia arrays use column-major layout (Fortran order), which affects performance:
+
+```julia
+# Column-major access is faster
+matrix = rand(1000, 1000)
+
+# Fast: iterate by columns
+function fast_iteration(matrix)
+    sum = 0.0
+    for j in 1:size(matrix, 2)
+        for i in 1:size(matrix, 1)
+            sum += matrix[i, j]
+        end
+    end
+    return sum
+end
+
+# Slow: iterate by rows
+function slow_iteration(matrix)
+    sum = 0.0
+    for i in 1:size(matrix, 1)
+        for j in 1:size(matrix, 2)
+            sum += matrix[i, j]
+        end
+    end
+    return sum
+end
+```
+
+### Tuples and Named Tuples
+
+Tuples are immutable, fixed-length collections that can hold elements of different types. They are lightweight, fast, and commonly used for returning multiple values from functions.
+
+#### Basic Tuples
+
+```julia
+# Create tuples
+t1 = (1, 2, 3)                    # Tuple{Int64, Int64, Int64}
+t2 = (1, "hello", 3.14)           # Tuple{Int64, String, Float64}
+t3 = (1,)                         # Single-element tuple (note the comma)
+
+# Tuples are immutable
+# t1[1] = 10  # ERROR: Cannot modify tuple
+
+# Tuples can contain any types
+t4 = ([1, 2, 3], "vector")        # Tuple{Vector{Int64}, String}
+```
+
+#### Named Tuples
+
+Named tuples are immutable collections with named fields, providing a lightweight alternative to structs for simple data structures.
+
+```julia
+# Create named tuples
+nt1 = (x=1, y=2, z=3)             # NamedTuple{(:x, :y, :z), Tuple{Int64, Int64, Int64}}
+nt2 = (name="Julia", version=1.8)  # NamedTuple{(:name, :version), Tuple{String, Int64}}
+
+# Access fields
+nt1.x                             # 1
+nt1[:x]                           # 1 (symbol indexing)
+nt1[1]                            # 1 (integer indexing)
+
+# Merging named tuples
+nt3 = merge(nt1, (w=4,))          # (x=1, y=2, z=3, w=4)
+```
+
+#### Destructuring
+
+```julia
+# Destructure tuples
+x, y, z = (1, 2, 3)
+println("x=$x, y=$y, z=$z")       # x=1, y=2, z=3
+
+# Destructure named tuples
+point = (x=10, y=20)
+x, y = point                      # x=10, y=20
+
+# Selective destructuring
+(; x) = point                     # Only extract x
+println("x=$x")                   # x=10
+```
+
+### Dictionaries and Sets
+
+Dictionaries provide key-value storage, while sets store unique elements efficiently.
+
+#### Dictionaries
+
+```julia
+# Create dictionaries
+d1 = Dict{String, Int}()          # Empty typed dictionary
+d2 = Dict("a" => 1, "b" => 2)     # Dictionary with initial values
+d3 = Dict{Char, Int}()            # Empty dictionary with specific types
+
+# Dictionary operations
+d2["c"] = 3                       # Add new key-value pair
+haskey(d2, "a")                   # true
+get(d2, "d", 0)                   # 0 (default value if key doesn't exist)
+delete!(d2, "b")                  # Remove key-value pair
+
+# Iterate over dictionaries
+for (key, value) in d2
+    println("$key => $value")
+end
+```
+
+#### Sets
+
+```julia
+# Create sets
+s1 = Set{Int}()                   # Empty typed set
+s2 = Set([1, 2, 3, 4, 5])         # Set from array
+s3 = Set("hello")                 # Set of characters
+
+# Set operations
+push!(s1, 1)                      # Add element
+pop!(s1, 1)                       # Remove element
+union(s1, s2)                     # Union of sets
+intersect(s1, s2)                 # Intersection of sets
+setdiff(s1, s2)                   # Set difference
+```
+
+### Strings
+
+Strings in Julia are immutable sequences of characters with powerful manipulation capabilities.
+
+#### String Manipulation
+
+```julia
+# String creation and concatenation
+str1 = "Hello"
+str2 = "World"
+str3 = str1 * " " * str2          # "Hello World"
+
+# String interpolation
+name = "Julia"
+greeting = "Hello, $name!"        # "Hello, Julia!"
+
+# String functions
+split("a,b,c", ",")               # ["a", "b", "c"]
+join(["a", "b", "c"], "-")        # "a-b-c"
+replace("hello world", "o" => "0") # "hell0 w0rld"
+strip("  hello  ")                # "hello"
+```
+
+#### Regular Expressions
+
+```julia
+# Basic regex usage
+text = "The year is 2023"
+pattern = r"\d{4}"                # Match 4 digits
+match(pattern, text)              # RegexMatch("2023")
+
+# Find all matches
+text = "Years: 2020, 2021, 2022, 2023"
+pattern = r"\d{4}"
+collect(eachmatch(pattern, text)) # Array of matches
+
+# String replacement with regex
+replace(text, r"\d{4}" => "YEAR") # "Years: YEAR, YEAR, YEAR, YEAR"
+```
+
+#### Performance Tips
+
+```julia
+# ✅ Good: Use string interpolation for concatenation
+name = "Julia"
+greeting = "Hello, $name!"        # Fast
+
+# ❌ Avoid: String concatenation in loops
+result = ""
+for i in 1:1000
+    result = result * string(i)   # Slow: creates new string each time
+end
+
+# ✅ Good: Use join for multiple strings
+result = join([string(i) for i in 1:1000], "")  # Fast
+```
+
+---
+
 ## Performance in Julia
 
 Julia is designed for high performance, combining the ease of use of dynamic languages with the speed of compiled languages. Understanding Julia's performance characteristics is crucial for writing efficient code.
@@ -7483,9 +7622,6 @@ view_arr = view(large_array, 1:100, 1:100)
 - In **R**, vectorization is a workaround for slow loops.
 - In **Julia**, loops are already fast — devectorized loops can even be faster.
 - **LoopVectorization.jl** is about _hardware-level SIMD_, not R-style vectorization.
-
-
-
 
 - Julia uses 1-based indexing for arrays by default, and it can also handle arbitrary [index offsets](../../devdocs/offset-arrays/#man-custom-indices).
 - Functions and variables share the same namespace (“Lisp-1”).
