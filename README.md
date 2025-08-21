@@ -7490,47 +7490,6 @@ view_arr = view(large_array, 1:100, 1:100)
 
 
 
-## [Noteworthy differences from Python](#Noteworthy-differences-from-Python)[](#Noteworthy-differences-from-Python "Permalink")
-
-- Julia's `for`, `if`, `while`, etc. blocks are terminated by the `end` keyword. Indentation level is not significant as it is in Python. Unlike Python, Julia has no `pass` keyword.
-- Strings are denoted by double quotation marks (`"text"`) in Julia (with three double quotation marks for multi-line strings), whereas in Python they can be denoted either by single (`'text'`) or double quotation marks (`"text"`). Single quotation marks are used for characters in Julia (`'c'`).
-- String concatenation is done with `*` in Julia, not `+` like in Python. Analogously, string repetition is done with `^`, not `*`. Implicit string concatenation of string literals like in Python (e.g. `'ab' 'cd' == 'abcd'`) is not done in Julia.
-- Python Lists—flexible but slow—correspond to the Julia `Vector{Any}` type or more generally `Vector{T}` where `T` is some non-concrete element type. "Fast" arrays like NumPy arrays that store elements in-place (i.e., `dtype` is `np.float64`, `[('f1', np.uint64), ('f2', np.int32)]`, etc.) can be represented by `Array{T}` where `T` is a concrete, immutable element type. This includes built-in types like `Float64`, `Int32`, `Int64` but also more complex types like `Tuple{UInt64,Float64}` and many user-defined types as well.
-- In Julia, indexing of arrays, strings, etc. is 1-based not 0-based.
-- Julia's slice indexing includes the last element, unlike in Python. `a[2:3]` in Julia is `a[1:3]` in Python.
-- Unlike Python, Julia allows [AbstractArrays with arbitrary indexes](https://julialang.org/blog/2017/04/offset-arrays/). Python's special interpretation of negative indexing, `a[-1]` and `a[-2]`, should be written `a[end]` and `a[end-1]` in Julia.
-- Julia requires `end` for indexing until the last element. `x[1:]` in Python is equivalent to `x[2:end]` in Julia.
-- In Julia, `:` before any object creates a [`Symbol`](../../base/base/#Core.Symbol) or _quotes_ an expression; so, `x[:5]` is same as `x[5]`. If you want to get the first `n` elements of an array, then use range indexing.
-- Julia's range indexing has the format of `x[start:step:stop]`, whereas Python's format is `x[start:(stop+1):step]`. Hence, `x[0:10:2]` in Python is equivalent to `x[1:2:10]` in Julia. Similarly, `x[::-1]` in Python, which refers to the reversed array, is equivalent to `x[end:-1:1]` in Julia.
-- In Julia, ranges can be constructed independently as `start:step:stop`, the same syntax it uses in array-indexing. The `range` function is also supported.
-- In Julia, indexing a matrix with arrays like `X[[1,2], [1,3]]` refers to a sub-matrix that contains the intersections of the first and second rows with the first and third columns. In Python, `X[[1,2], [1,3]]` refers to a vector that contains the values of cell `[1,1]` and `[2,3]` in the matrix. `X[[1,2], [1,3]]` in Julia is equivalent with `X[np.ix_([0,1],[0,2])]` in Python. `X[[0,1], [0,2]]` in Python is equivalent with `X[[CartesianIndex(1,1), CartesianIndex(2,3)]]` in Julia.
-- Julia has no line continuation syntax: if, at the end of a line, the input so far is a complete expression, it is considered done; otherwise the input continues. One way to force an expression to continue is to wrap it in parentheses.
-- Julia arrays are column-major (Fortran-ordered) whereas NumPy arrays are row-major (C-ordered) by default. To get optimal performance when looping over arrays, the order of the loops should be reversed in Julia relative to NumPy (see [relevant section of Performance Tips](../performance-tips/#man-performance-column-major)).
-- Julia's updating operators (e.g. `+=`, `-=`, ...) are _not in-place_ whereas NumPy's are. This means `A = [1, 1]; B = A; B += [3, 3]` doesn't change values in `A`, it rather rebinds the name `B` to the result of the right-hand side `B = B + 3`, which is a new array. For in-place operation, use `B .+= 3` (see also [dot operators](../mathematical-operations/#man-dot-operators)), explicit loops, or `InplaceOps.jl`.
-- Julia evaluates default values of function arguments every time the method is invoked, unlike in Python where the default values are evaluated only once when the function is defined. For example, the function `f(x=rand()) = x` returns a new random number every time it is invoked without argument. On the other hand, the function `g(x=[1,2]) = push!(x,3)` returns `[1,2,3]` every time it is called as `g()`.
-- In Julia, keyword arguments must be passed using keywords, unlike Python in which it is usually possible to pass them positionally. Attempting to pass a keyword argument positionally alters the method signature leading to a `MethodError` or calling of the wrong method.
-- In Julia `%` is the remainder operator, whereas in Python it is the modulus.
-- In Julia, the commonly used `Int` type corresponds to the machine integer type (`Int32` or `Int64`), unlike in Python, where `int` is an arbitrary length integer. This means in Julia the `Int` type will overflow, such that `2^64 == 0`. If you need larger values use another appropriate type, such as `Int128`, [`BigInt`](../../base/numbers/#Base.GMP.BigInt) or a floating point type like `Float64`.
-- The imaginary unit `sqrt(-1)` is represented in Julia as `im`, not `j` as in Python.
-- In Julia, the exponentiation operator is `^`, not `**` as in Python.
-- Julia uses `nothing` of type `Nothing` to represent a null value, whereas Python uses `None` of type `NoneType`.
-- In Julia, the standard operators over a matrix type are matrix operations, whereas, in Python, the standard operators are element-wise operations. When both `A` and `B` are matrices, `A * B` in Julia performs matrix multiplication, not element-wise multiplication as in Python. `A * B` in Julia is equivalent with `A @ B` in Python, whereas `A * B` in Python is equivalent with `A .* B` in Julia.
-- The adjoint operator `'` in Julia returns an adjoint of a vector (a lazy representation of row vector), whereas the transpose operator `.T` over a vector in Python returns the original vector (non-op).
-- In Julia, a function may contain multiple concrete implementations (called _methods_), which are selected via multiple dispatch based on the types of all arguments to the call, as compared to functions in Python, which have a single implementation and no polymorphism (as opposed to Python method calls which use a different syntax and allows dispatch on the receiver of the method).
-- There are no classes in Julia. Instead there are structures (mutable or immutable), containing data but no methods.
-- Calling a method of a class instance in Python (`x = MyClass(*args); x.f(y)`) corresponds to a function call in Julia, e.g. `x = MyType(args...); f(x, y)`. In general, multiple dispatch is more flexible and powerful than the Python class system.
-- Julia structures may have exactly one abstract supertype, whereas Python classes can inherit from one or more (abstract or concrete) superclasses.
-- The logical Julia program structure (Packages and Modules) is independent of the file structure, whereas the Python code structure is defined by directories (Packages) and files (Modules).
-- In Julia, it is idiomatic to split the text of large modules into multiple files, without introducing a new module per file. The code is reassembled inside a single module in a main file via `include`. While the Python equivalent (`exec`) is not typical for this use (it will silently clobber prior definitions), Julia programs are defined as a unit at the `module` level with `using` or `import`, which will only get executed once when first needed–like `include` in Python. Within those modules, the individual files that make up that module are loaded with `include` by listing them once in the intended order.
-- The ternary operator `x > 0 ? 1 : -1` in Julia corresponds to a conditional expression in Python `1 if x > 0 else -1`.
-- In Julia the `@` symbol refers to a macro, whereas in Python it refers to a decorator.
-- Exception handling in Julia is done using `try` — `catch` — `finally`, instead of `try` — `except` — `finally`. In contrast to Python, it is not recommended to use exception handling as part of the normal workflow in Julia (compared with Python, Julia is faster at ordinary control flow but slower at exception-catching).
-- In Julia loops are fast, there is no need to write "vectorized" code for performance reasons.
-- Be careful with non-constant global variables in Julia, especially in tight loops. Since you can write close-to-metal code in Julia (unlike Python), the effect of globals can be drastic (see [Performance Tips](../performance-tips/#man-performance-tips)).
-- In Julia, rounding and truncation are explicit. Python's `int(3.7)` should be `floor(Int, 3.7)` or `Int(floor(3.7))` and is distinguished from `round(Int, 3.7)`. `floor(x)` and `round(x)` on their own return an integer value of the same type as `x` rather than always returning `Int`.
-- In Julia, parsing is explicit. Python's `float("3.7")` would be `parse(Float64, "3.7")` in Julia.
-- In Python, the majority of values can be used in logical contexts (e.g. `if "a":` means the following block is executed, and `if "":` means it is not). In Julia, you need explicit conversion to `Bool` (e.g. `if "a"` throws an exception). If you want to test for a non-empty string in Julia, you would explicitly write `if !isempty("")`. Perhaps surprisingly, in Python `if "False"` and `bool("False")` both evaluate to `True` (because `"False"` is a non-empty string); in Julia, `parse(Bool, "false")` returns `false`.
-- In Julia, a new local scope is introduced by most code blocks, including loops and `try` — `catch` — `finally`. Note that comprehensions (list, generator, etc.) introduce a new local scope both in Python and Julia, whereas `if` blocks do not introduce a new local scope in both languages.
 
 ## [Noteworthy differences from C/C++](#Noteworthy-differences-from-C/C)[](#Noteworthy-differences-from-C/C "Permalink")
 
@@ -9693,8 +9652,6 @@ names(SparseArrays)         # List all exported names from SparseArrays
 # 4. Workshops and Conferences
 # JuliaCon and local meetups
 ```
-
-
 
 ---
 
