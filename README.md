@@ -7230,6 +7230,88 @@ end  # ~2.0 ms
 
 ---
 
+## Language Comparisons
+
+Julia is designed to be familiar to users of other programming languages while providing unique features and performance characteristics. This section highlights key differences between Julia and other popular languages.
+
+### Julia vs MATLAB
+
+Although MATLAB users may find Julia's syntax familiar, Julia is not a MATLAB clone. There are major syntactic and functional differences:
+
+- **Array Indexing**: Julia arrays are indexed with square brackets `A[i,j]`, not parentheses
+- **Array Assignment**: Julia arrays are not copied when assigned to another variable. After `A = B`, changing elements of `B` will modify `A` as well
+- **Array Growth**: Julia does not automatically grow arrays in assignment statements. Use `push!` and `append!` for efficient array growth
+- **Imaginary Unit**: The imaginary unit `sqrt(-1)` is represented as `im`, not `i` or `j`
+- **Multiple Returns**: Julia uses tuples for multiple return values: `(a, b) = (1, 2)` or `a, b = 1, 2`
+- **Ranges**: Julia's `a:b` constructs `AbstractRange` objects, not full vectors
+- **Logical Operations**: Use `A .== B` for element-wise comparison, not `A == B`
+- **Bitwise Operations**: Use `&`, `|`, and `⊻` for bitwise operations
+- **Structs**: Julia's `struct`s are immutable by default and don't support dynamic field addition
+
+### Julia vs Python
+
+Julia shares some syntax with Python but has important differences:
+
+- **Block Structure**: Julia uses `end` to terminate blocks, not indentation
+- **String Concatenation**: Use `*` for string concatenation, not `+`
+- **Indexing**: Julia uses 1-based indexing, not 0-based
+- **Array Types**: Julia's `Vector{T}` provides type safety and performance
+- **Matrix Operations**: `A * B` performs matrix multiplication in Julia, not element-wise multiplication
+- **Multiple Dispatch**: Julia's function system is more powerful than Python's class system
+- **Type System**: Julia has a sophisticated type system with parametric types
+- **Performance**: Julia code can be as fast as C, while Python requires optimization
+
+### Julia vs R
+
+Julia aims to be an effective language for data analysis and statistical programming:
+
+- **String Handling**: Julia's single quotes enclose characters, not strings
+- **Vector Construction**: Use `[1, 2, 3]` instead of `c(1, 2, 3)`
+- **Logical Indexing**: Julia's logical indexing is more restrictive than R's
+- **Vector Operations**: Julia doesn't allow operations on vectors of different lengths
+- **Matrix Operations**: Use `A * B` for matrix multiplication, not `A %*% B`
+- **Missing Values**: Use `missing` instead of `NA`
+- **Performance**: Julia doesn't require vectorization for performance
+- **Type System**: Julia's type system provides better performance and safety
+
+### Julia vs C/C++
+
+Julia provides high-level syntax with C-like performance:
+
+- **Indexing**: Julia uses 1-based indexing, not 0-based
+- **Memory Management**: Julia has automatic memory management with garbage collection
+- **Array Layout**: Julia arrays are column-major (Fortran order), not row-major
+- **Type System**: Julia's type system is more sophisticated than C/C++
+- **Multiple Dispatch**: Julia's function system is more flexible than C++'s
+- **Modules**: Julia's module system is more powerful than C++ namespaces
+- **Performance**: Julia can achieve C-like performance without manual optimization
+
+### Performance Benchmarks
+
+Julia's performance characteristics make it competitive with compiled languages:
+
+```julia
+# Julia performance is often comparable to C/C++
+# Example: Matrix multiplication
+using BenchmarkTools
+
+A = rand(1000, 1000)
+B = rand(1000, 1000)
+
+@btime A * B  # Often as fast as optimized C/C++ code
+```
+
+### Key Advantages of Julia
+
+1. **Performance**: Julia code can be as fast as C/C++ without manual optimization
+2. **Productivity**: High-level syntax similar to Python/MATLAB
+3. **Type System**: Sophisticated type system with parametric types
+4. **Multiple Dispatch**: Powerful function system based on argument types
+5. **Interoperability**: Easy integration with C, Python, and R
+6. **Scientific Computing**: Built-in support for linear algebra and numerical computing
+
+---
+
 ## Performance in Julia
 
 Julia is designed for high performance, combining the ease of use of dynamic languages with the speed of compiled languages. Understanding Julia's performance characteristics is crucial for writing efficient code.
@@ -7404,95 +7486,9 @@ view_arr = view(large_array, 1:100, 1:100)
 
 # [Noteworthy Differences from other Languages](#Noteworthy-Differences-from-other-Languages)[](#Noteworthy-Differences-from-other-Languages "Permalink")
 
-## [Noteworthy differences from MATLAB](#Noteworthy-differences-from-MATLAB)[](#Noteworthy-differences-from-MATLAB "Permalink")
 
-Although MATLAB users may find Julia's syntax familiar, Julia is not a MATLAB clone. There are major syntactic and functional differences. The following are some noteworthy differences that may trip up Julia users accustomed to MATLAB:
 
-- Julia arrays are indexed with square brackets, `A[i,j]`.
-- Julia arrays are not copied when assigned to another variable. After `A = B`, changing elements of `B` will modify `A` as well. To avoid this, use `A = copy(B)`.
-- Julia values are not copied when passed to a function. If a function modifies an array, the changes will be visible in the caller.
-- Julia does not automatically grow arrays in an assignment statement. Whereas in MATLAB `a(4) = 3.2` can create the array `a = [0 0 0 3.2]` and `a(5) = 7` can grow it into `a = [0 0 0 3.2 7]`, the corresponding Julia statement `a[5] = 7` throws an error if the length of `a` is less than 5 or if this statement is the first use of the identifier `a`. Julia has [`push!`](../../base/collections/#Base.push!) and [`append!`](../../base/collections/#Base.append!), which grow `Vector`s much more efficiently than MATLAB's `a(end+1) = val`.
-- The imaginary unit `sqrt(-1)` is represented in Julia as [`im`](../../base/numbers/#Base.im), not `i` or `j` as in MATLAB.
-- In Julia, literal numbers without a decimal point (such as `42`) create integers instead of floating point numbers. As a result, some operations can throw a domain error if they expect a float; for example, `julia> a = -1; 2^a` throws a domain error, as the result is not an integer (see [the FAQ entry on domain errors](../faq/#faq-domain-errors) for details).
-- In Julia, multiple values are returned and assigned as tuples, e.g. `(a, b) = (1, 2)` or `a, b = 1, 2`. MATLAB's `nargout`, which is often used in MATLAB to do optional work based on the number of returned values, does not exist in Julia. Instead, users can use optional and keyword arguments to achieve similar capabilities.
-- Julia has true one-dimensional arrays. Column vectors are of size `N`, not `Nx1`. For example, [`rand(N)`](../../stdlib/Random/#Base.rand) makes a 1-dimensional array.
-- In Julia, `[x,y,z]` will always construct a 3-element array containing `x`, `y` and `z`.
-  - To concatenate in the first ("vertical") dimension use either [`vcat(x,y,z)`](../../base/arrays/#Base.vcat) or separate with semicolons (`[x; y; z]`).
-  - To concatenate in the second ("horizontal") dimension use either [`hcat(x,y,z)`](../../base/arrays/#Base.hcat) or separate with spaces (`[x y z]`).
-  - To construct block matrices (concatenating in the first two dimensions), use either [`hvcat`](../../base/arrays/#Base.hvcat) or combine spaces and semicolons (`[a b; c d]`).
-- In Julia, `a:b` and `a:b:c` construct `AbstractRange` objects. To construct a full vector like in MATLAB, use [`collect(a:b)`](../../base/collections/#Base.collect-Tuple{Any}). Generally, there is no need to call `collect` though. An `AbstractRange` object will act like a normal array in most cases but is more efficient because it lazily computes its values. This pattern of creating specialized objects instead of full arrays is used frequently, and is also seen in functions such as [`range`](../../base/math/#Base.range), or with iterators such as `enumerate`, and `zip`. The special objects can mostly be used as if they were normal arrays.
-- Functions in Julia return values from their last expression or the `return` keyword instead of listing the names of variables to return in the function definition (see [The return Keyword](../functions/#The-return-Keyword) for details).
-- A Julia script may contain any number of functions, and all definitions will be externally visible when the file is loaded. Function definitions can be loaded from files outside the current working directory.
-- In Julia, reductions such as [`sum`](../../base/collections/#Base.sum), [`prod`](../../base/collections/#Base.prod), and [`maximum`](../../base/collections/#Base.maximum) are performed over every element of an array when called with a single argument, as in `sum(A)`, even if `A` has more than one dimension.
-- In Julia, parentheses must be used to call a function with zero arguments, like in [`rand()`](../../stdlib/Random/#Base.rand).
-- Julia discourages the use of semicolons to end statements. The results of statements are not automatically printed (except at the interactive prompt), and lines of code do not need to end with semicolons. [`println`](../../base/io-network/#Base.println) or [`@printf`](../../stdlib/Printf/#Printf.@printf) can be used to print specific output.
-- In Julia, if `A` and `B` are arrays, logical comparison operations like `A == B` do not return an array of booleans. Instead, use `A .== B`, and similarly for the other boolean operators like [`<`](../../base/math/#Base.:<), [`>`](../../base/math/#Base.:>).
-- In Julia, the operators [`&`](../../base/math/#Base.:&), [`|`](../../base/math/#Base.:|), and [`⊻`](../../base/math/#Base.xor) ([`xor`](../../base/math/#Base.xor)) perform the bitwise operations equivalent to `and`, `or`, and `xor` respectively in MATLAB, and have precedence similar to Python's bitwise operators (unlike C). They can operate on scalars or element-wise across arrays and can be used to combine logical arrays, but note the difference in order of operations: parentheses may be required (e.g., to select elements of `A` equal to 1 or 2 use `(A .== 1) .| (A .== 2)`).
-- In Julia, the elements of a collection can be passed as arguments to a function using the splat operator `...`, as in `xs=[1,2]; f(xs...)`.
-- Julia's [`svd`](../../stdlib/LinearAlgebra/#LinearAlgebra.svd) returns singular values as a vector instead of as a dense diagonal matrix.
-- In Julia, `...` is not used to continue lines of code. Instead, incomplete expressions automatically continue onto the next line.
-- In both Julia and MATLAB, the variable `ans` is set to the value of the last expression issued in an interactive session. In Julia, unlike MATLAB, `ans` is not set when Julia code is run in non-interactive mode.
-- Julia's `struct`s do not support dynamically adding fields at runtime, unlike MATLAB's `class`es. Instead, use a [`Dict`](../../base/collections/#Base.Dict). Dict in Julia isn't ordered.
-- In Julia each module has its own global scope/namespace, whereas in MATLAB there is just one global scope.
-- In MATLAB, an idiomatic way to remove unwanted values is to use logical indexing, like in the expression `x(x>3)` or in the statement `x(x>3) = []` to modify `x` in-place. In contrast, Julia provides the higher order functions [`filter`](../../base/collections/#Base.filter) and [`filter!`](../../base/collections/#Base.filter!), allowing users to write `filter(z->z>3, x)` and `filter!(z->z>3, x)` as alternatives to the corresponding transliterations `x[x.>3]` and `x = x[x.>3]`. Using [`filter!`](../../base/collections/#Base.filter!) reduces the use of temporary arrays.
-- The analogue of extracting (or "dereferencing") all elements of a cell array, e.g. in `vertcat(A{:})` in MATLAB, is written using the splat operator in Julia, e.g. as `vcat(A...)`.
-- In Julia, the `adjoint` function performs conjugate transposition; in MATLAB, `adjoint` provides the "adjugate" or classical adjoint, which is the transpose of the matrix of cofactors.
-- In Julia, a^b^c is evaluated a^(b^c) while in MATLAB it's (a^b)^c.
 
-## [Noteworthy differences from R](#Noteworthy-differences-from-R)[](#Noteworthy-differences-from-R "Permalink")
-
-One of Julia's goals is to provide an effective language for data analysis and statistical programming. For users coming to Julia from R, these are some noteworthy differences:
-
-- Julia's single quotes enclose characters, not strings.
-- Julia can create substrings by indexing into strings. In R, strings must be converted into character vectors before creating substrings.
-- In Julia, like Python but unlike R, strings can be created with triple quotes `""" ... """`. This syntax is convenient for constructing strings that contain line breaks.
-- In Julia, varargs are specified using the splat operator `...`, which always follows the name of a specific variable, unlike R, for which `...` can occur in isolation.
-- In Julia, modulus is `mod(a, b)`, not `a %% b`. `%` in Julia is the remainder operator.
-- Julia constructs vectors using brackets. Julia's `[1, 2, 3]` is the equivalent of R's `c(1, 2, 3)`.
-- In Julia, not all data structures support logical indexing. Furthermore, logical indexing in Julia is supported only with vectors of length equal to the object being indexed. For example:
-
-  - In R, `c(1, 2, 3, 4)[c(TRUE, FALSE)]` is equivalent to `c(1, 3)`.
-  - In R, `c(1, 2, 3, 4)[c(TRUE, FALSE, TRUE, FALSE)]` is equivalent to `c(1, 3)`.
-  - In Julia, `[1, 2, 3, 4][[true, false]]` throws a [`BoundsError`](../../base/base/#Core.BoundsError).
-  - In Julia, `[1, 2, 3, 4][[true, false, true, false]]` produces `[1, 3]`.
-
-- Like many languages, Julia does not always allow operations on vectors of different lengths, unlike R where the vectors only need to share a common index range. For example, `c(1, 2, 3, 4) + c(1, 2)` is valid R but the equivalent `[1, 2, 3, 4] + [1, 2]` will throw an error in Julia.
-- Julia allows an optional trailing comma when that comma does not change the meaning of code. This can cause confusion among R users when indexing into arrays. For example, `x[1,]` in R would return the first row of a matrix; in Julia, however, the comma is ignored, so `x[1,] == x[1]`, and will return the first element. To extract a row, be sure to use `:`, as in `x[1,:]`.
-- Julia's [`map`](../../base/collections/#Base.map) takes the function first, then its arguments, unlike `lapply(<structure>, function, ...)` in R. Similarly Julia's equivalent of `apply(X, MARGIN, FUN, ...)` in R is [`mapslices`](../../base/arrays/#Base.mapslices) where the function is the first argument.
-- Multivariate apply in R, e.g. `mapply(choose, 11:13, 1:3)`, can be written as `broadcast(binomial, 11:13, 1:3)` in Julia. Equivalently Julia offers a shorter dot syntax for vectorizing functions `binomial.(11:13, 1:3)`.
-- Julia uses `end` to denote the end of conditional blocks, like `if`, loop blocks, like `while`/ `for`, and functions. In lieu of the one-line `if ( cond ) statement`, Julia allows statements of the form `if cond; statement; end`, `cond && statement` and `!cond || statement`. Assignment statements in the latter two syntaxes must be explicitly wrapped in parentheses, e.g. `cond && (x = value)`.
-- In Julia, `<-`, `<<-` and `->` are not assignment operators.
-- Julia's `->` creates an anonymous function.
-- Julia's [`*`](../../base/math/#Base.:_-Tuple{Any, Vararg{Any}}) operator can perform matrix multiplication, unlike in R. If `A` and `B` are matrices, then `A _ B`denotes a matrix multiplication in Julia, equivalent to R's`A %_% B`. In R, this same notation would perform an element-wise (Hadamard) product. To get the element-wise multiplication operation, you need to write `A ._ B` in Julia.
-- Julia performs matrix transposition using the `transpose` function and conjugated transposition using the `'` operator or the `adjoint` function. Julia's `transpose(A)` is therefore equivalent to R's `t(A)`. Additionally a non-recursive transpose in Julia is provided by the `permutedims` function.
-- Julia does not require parentheses when writing `if` statements or `for`/`while` loops: use `for i in [1, 2, 3]` instead of `for (i in c(1, 2, 3))` and `if i == 1` instead of `if (i == 1)`.
-- Julia does not treat the numbers `0` and `1` as Booleans. You cannot write `if (1)` in Julia, because `if` statements accept only booleans. Instead, you can write `if true`, `if Bool(1)`, or `if 1==1`.
-- Julia does not provide `nrow` and `ncol`. Instead, use `size(M, 1)` for `nrow(M)` and `size(M, 2)` for `ncol(M)`.
-- Julia is careful to distinguish scalars, vectors and matrices. In R, `1` and `c(1)` are the same. In Julia, they cannot be used interchangeably.
-- Julia's [`diag`](../../stdlib/LinearAlgebra/#LinearAlgebra.diag) and [`diagm`](../../stdlib/LinearAlgebra/#LinearAlgebra.diagm) are not like R's.
-- Julia cannot assign to the results of function calls on the left hand side of an assignment operation: you cannot write `diag(M) = fill(1, n)`.
-- Julia discourages populating the main namespace with functions. Most statistical functionality for Julia is found in [packages](https://pkg.julialang.org/) under the [JuliaStats organization](https://github.com/JuliaStats). For example:
-
-  - Functions pertaining to probability distributions are provided by the [Distributions package](https://github.com/JuliaStats/Distributions.jl).
-  - The [DataFrames package](https://github.com/JuliaData/DataFrames.jl) provides data frames.
-  - Generalized linear models are provided by the [GLM package](https://github.com/JuliaStats/GLM.jl).
-
-- Julia provides tuples and real hash tables, but not R-style lists. When returning multiple items, you should typically use a tuple or a named tuple: instead of `list(a = 1, b = 2)`, use `(1, 2)` or `(a=1, b=2)`.
-- Julia encourages users to write their own types, which are easier to use than S3 or S4 objects in R. Julia's multiple dispatch system means that `table(x::TypeA)` and `table(x::TypeB)` act like R's `table.TypeA(x)` and `table.TypeB(x)`.
-- In Julia, values are not copied when assigned or passed to a function. If a function modifies an array, the changes will be visible in the caller. This is very different from R and allows new functions to operate on large data structures much more efficiently.
-- In Julia, vectors and matrices are concatenated using [`hcat`](../../base/arrays/#Base.hcat), [`vcat`](../../base/arrays/#Base.vcat) and [`hvcat`](../../base/arrays/#Base.hvcat), not `c`, `rbind` and `cbind` like in R.
-- In Julia, a range like `a:b` is not shorthand for a vector like in R, but is a specialized `AbstractRange` object that is used for iteration. To convert a range into a vector, use [`collect(a:b)`](../../base/collections/#Base.collect-Tuple{Any}).
-- The `:` operator has a different precedence in R and Julia. In particular, in Julia arithmetic operators have higher precedence than the `:` operator, whereas the reverse is true in R. For example, `1:n-1` in Julia is equivalent to `1:(n-1)` in R.
-- Julia's [`max`](../../base/math/#Base.max) and [`min`](../../base/math/#Base.min) are the equivalent of `pmax` and `pmin` respectively in R, but both arguments need to have the same dimensions. While [`maximum`](../../base/collections/#Base.maximum) and [`minimum`](../../base/collections/#Base.minimum) replace `max` and `min` in R, there are important differences.
-- Julia's [`sum`](../../base/collections/#Base.sum), [`prod`](../../base/collections/#Base.prod), [`maximum`](../../base/collections/#Base.maximum), and [`minimum`](../../base/collections/#Base.minimum) are different from their counterparts in R. They all accept an optional keyword argument `dims`, which indicates the dimensions, over which the operation is carried out. For instance, let `A = [1 2; 3 4]` in Julia and `B <- rbind(c(1,2),c(3,4))` be the same matrix in R. Then `sum(A)` gives the same result as `sum(B)`, but `sum(A, dims=1)` is a row vector containing the sum over each column and `sum(A, dims=2)` is a column vector containing the sum over each row. This contrasts to the behavior of R, where separate `colSums(B)` and `rowSums(B)` functions provide these functionalities. If the `dims` keyword argument is a vector, then it specifies all the dimensions over which the sum is performed, while retaining the dimensions of the summed array, e.g. `sum(A, dims=(1,2)) == hcat(10)`. It should be noted that there is no error checking regarding the second argument.
-- Julia has several functions that can mutate their arguments. For example, it has both [`sort`](../../base/sort/#Base.sort) and [`sort!`](../../base/sort/#Base.sort!).
-- In R, performance requires vectorization. In Julia, almost the opposite is true: the best performing code is often achieved by using devectorized loops.
-- Julia is eagerly evaluated and does not support R-style lazy evaluation. For most users, this means that there are very few unquoted expressions or column names.
-- Julia does not support the `NULL` type. The closest equivalent is [`nothing`](../../base/constants/#Core.nothing), but it behaves like a scalar value rather than like a list. Use `x === nothing` instead of `is.null(x)`.
-- In Julia, missing values are represented by the [`missing`](../missing/#missing) object rather than by `NA`. Use [`ismissing(x)`](../../base/base/#Base.ismissing) (or `ismissing.(x)` for element-wise operation on vectors) instead of `is.na(x)`. The [`skipmissing`](../../base/base/#Base.skipmissing) function is generally used instead of `na.rm=TRUE` (though in some particular cases functions take a `skipmissing` argument).
-- Julia lacks the equivalent of R's `assign` or `get`.
-- In Julia, `return` does not require parentheses.
-- In R, an idiomatic way to remove unwanted values is to use logical indexing, like in the expression `x[x>3]` or in the statement `x = x[x>3]` to modify `x` in-place. In contrast, Julia provides the higher order functions [`filter`](../../base/collections/#Base.filter) and [`filter!`](../../base/collections/#Base.filter!), allowing users to write `filter(z->z>3, x)` and `filter!(z->z>3, x)` as alternatives to the corresponding transliterations `x[x.>3]` and `x = x[x.>3]`. Using [`filter!`](../../base/collections/#Base.filter!) reduces the use of temporary arrays.
 
 ## [Noteworthy differences from Python](#Noteworthy-differences-from-Python)[](#Noteworthy-differences-from-Python "Permalink")
 
