@@ -512,101 +512,12 @@ data = [1, 2, 3, 4, 5]
 #### Closures vs Callable Objects
 
 ```julia
-# Both approaches can achieve similar results, but have different trade-offs
 
-# Approach 1: Callable Object
-struct GaussianCallable{T <: Real}
-    μ::T
-    σ::T
-end
-
-function (g::GaussianCallable{T})(x::Real) where T
-    return exp(-(x - g.μ)^2 / (2 * g.σ^2))
-end
-
-# Approach 2: Closure
-function make_gaussian(μ, σ)
-    return x -> exp(-(x - μ)^2 / (2 * σ^2))
-end
-
-# Usage comparison
-g1 = GaussianCallable(1.0, 0.5)
-g2 = make_gaussian(1.0, 0.5)
-
-@test g1(2) ≈ g2(2)
-@test g1(1.25) ≈ g2(1.25)
 ```
 
-#### When to Use Each Approach
 
-```julia
-# Use Callable Objects when:
-# 1. You want to define multiple methods for the same type
-# 2. You need type stability and performance
-# 3. You want to extend Base functions
-# 4. You need complex type hierarchies
 
-# Use Closures when:
-# 1. You need simple function-like behavior
-# 2. You want to capture arbitrary data
-# 3. You need dynamic behavior
-# 4. You're creating one-off functions
 
-# Example: Callable object with multiple methods
-struct FunctionApproximator{T <: Real}
-    data::Vector{T}
-    method::Symbol
-end
-
-function (fa::FunctionApproximator)(x::Real)
-    if fa.method == :linear
-        return linear_interpolate(fa.data, x)
-    elseif fa.method == :polynomial
-        return polynomial_fit(fa.data, x)
-    else
-        error("Unknown method: $(fa.method)")
-    end
-end
-
-# Example: Closure for simple data transformation
-function make_transformer(operation)
-    return data -> operation(data)
-end
-```
-
-#### Performance Considerations
-
-```julia
-# Callable objects can be more type-stable
-struct FastGaussian{T <: Real}
-    μ::T
-    σ::T
-    inv_2σ²::T  # Pre-computed for performance
-end
-
-function FastGaussian(μ::T, σ::T) where T <: Real
-    return FastGaussian(μ, σ, inv(2 * σ^2))
-end
-
-function (g::FastGaussian{T})(x::Real) where T
-    return exp(-(x - g.μ)^2 * g.inv_2σ²)
-end
-
-# Closures can be less type-stable but more flexible
-function make_flexible_gaussian(μ, σ)
-    inv_2σ² = inv(2 * σ^2)
-    return x -> exp(-(x - μ)^2 * inv_2σ²)
-end
-
-# Benchmark comparison
-using BenchmarkTools
-
-g1 = FastGaussian(1.0, 0.5)
-g2 = make_flexible_gaussian(1.0, 0.5)
-
-@btime g1(2.0)  # Usually faster due to type stability
-@btime g2(2.0)  # May be slower due to type inference
-```
 
 ### Memory Management and Garbage Collection
 
