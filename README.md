@@ -7324,7 +7324,20 @@ end  # ~2.0 ms
 
 ---
 
-## Vectorization Performance: R vs Julia
+## Performance in Julia
+
+Julia is designed for high performance, combining the ease of use of dynamic languages with the speed of compiled languages. Understanding Julia's performance characteristics is crucial for writing efficient code.
+
+### Why Julia is Fast
+
+1. **JIT Compilation**: Julia compiles code to optimized machine code at runtime
+2. **Type Stability**: Julia's type system allows for aggressive optimizations
+3. **Multiple Dispatch**: Specialized code paths for different argument types
+4. **Memory Layout**: Column-major layout optimized for scientific computing
+5. **SIMD Optimization**: Automatic vectorization of operations
+6. **Allocation Optimization**: Compiler can eliminate temporary allocations
+
+### Vectorization Performance: R vs Julia
 
 **Important Note**: While vectorization is often faster in many languages, this is not always the case in Julia. Julia's JIT compilation can make explicit loops just as fast as vectorized operations.
 
