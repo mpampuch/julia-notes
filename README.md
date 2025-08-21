@@ -7484,18 +7484,6 @@ view_arr = view(large_array, 1:100, 1:100)
 - In **Julia**, loops are already fast — devectorized loops can even be faster.
 - **LoopVectorization.jl** is about _hardware-level SIMD_, not R-style vectorization.
 
-# [Noteworthy Differences from other Languages](#Noteworthy-Differences-from-other-Languages)[](#Noteworthy-Differences-from-other-Languages "Permalink")
-
-
-
-
-
-
-
-
-
-
-
 
 
 
