@@ -515,10 +515,6 @@ data = [1, 2, 3, 4, 5]
 
 ```
 
-
-
-
-
 ### Memory Management and Garbage Collection
 
 ```julia
@@ -9701,10 +9697,6 @@ names(SparseArrays)         # List all exported names from SparseArrays
 # 4. Workshops and Conferences
 # JuliaCon and local meetups
 ```
-
----
-
-
 
 
 
