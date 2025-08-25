@@ -1,6 +1,53 @@
 # Julia Notes
 
-A collection of notes, examples, and resources for learning and working with the Julia programming language.
+A comprehensive collection of notes, examples, and resources for learning and working with the Julia programming language.
+
+## Table of Contents
+
+1. [Getting Started](#getting-started)
+   - [About Julia](#about-julia)
+   - [Resources](#resources)
+2. [Core Concepts](#core-concepts)
+   - [Julia DataTypes](#julia-datatypes)
+   - [How Julia Works Under the Hood](#how-julia-works-under-the-hood)
+   - [Type System](#type-system)
+   - [Functions and Multiple Dispatch](#functions-and-multiple-dispatch)
+3. [Data Structures](#data-structures)
+   - [Making Ranges in Julia](#making-ranges-in-julia)
+   - [Arrays in Julia](#arrays-in-julia)
+   - [Tuples and Named Tuples](#tuples-and-named-tuples)
+   - [Matrices in Julia](#matrices-in-julia)
+   - [Dictionaries and Sets](#dictionaries-and-sets)
+   - [Strings](#strings)
+4. [Advanced Features](#advanced-features)
+   - [Broadcasting in Julia](#broadcasting-in-julia)
+   - [Transposing in Julia](#transposing-in-julia)
+   - [Vectorization Performance: R vs Julia](#vectorization-performance-r-vs-julia)
+   - [Threading and Parallel Computing](#threading-and-parallel-computing)
+   - [Metaprogramming Basics](#metaprogramming-basics)
+   - [Structures (Structs) in Julia](#structures-structs-in-julia)
+5. [Development Tools](#development-tools)
+   - [Testing in Julia](#testing-in-julia)
+   - [Debugging in Julia](#debugging-in-julia)
+   - [Performance Profiling and Benchmarking](#performance-profiling-and-benchmarking)
+   - [Package Development and Testing in Julia](#package-development-and-testing-in-julia)
+   - [Revise.jl: Live Code Updates](#revisejl-live-code-updates)
+   - [Cthulhu.jl: Deep Dive into Julia's Internals](#cthulhujl-deep-dive-into-julias-internals)
+6. [Visualization](#visualization)
+   - [Makie.jl: Modern Plotting and Visualization](#makiejl-modern-plotting-and-visualization)
+7. [Reference](#reference)
+   - [REPL](#repl)
+   - [Useful Packages](#useful-packages)
+   - [Standard Library](#standard-library)
+   - [Packages](#packages)
+   - [Pluto](#pluto)
+   - [Julia VSCode Extension](#julia-vscode-extension)
+   - [Help Resources](#help-resources)
+   - [Cheatsheet](#cheatsheet)
+
+---
+
+## Getting Started
 
 ## About Julia
 
@@ -114,7 +161,11 @@ To get started with Julia:
 - A really good [Julia Cheatsheet](https://cheatsheet.juliadocs.org/)
 - [MatLab vs Python vs Julia Cheatsheet](https://cheatsheets.quantecon.org/)
 
-## Julia DataTypes
+---
+
+## Core Concepts
+
+### Julia DataTypes
 
 ![](imgs/Julia-types.png)
 
@@ -1046,7 +1097,11 @@ end
 4. **SIMD Optimization**: Julia can automatically vectorize operations
 5. **Allocation Optimization**: Julia's compiler can eliminate temporary allocations
 
-## Making Ranges in Julia
+---
+
+## Data Structures
+
+### Making Ranges in Julia
 
 Julia provides several ways to create ranges, which are efficient lazy sequences that don't store all values in memory.
 
@@ -6577,7 +6632,11 @@ sqrt.(A)    # [1.0 1.414; 1.732 2.0]
 
 ---
 
-## Broadcasting in Julia
+---
+
+## Advanced Features
+
+### Broadcasting in Julia
 
 Broadcasting is one of Julia's most powerful features for element-wise operations. It's more sophisticated than simple mapping because it can handle arrays of different shapes and dimensions automatically.
 
@@ -7848,7 +7907,11 @@ more `.h`/`.hpp` files<br>+bigger compiled `somebiglib.a`
 - Symbols do not belong to any package, and do not contain any values _per se_. `M.var` evaluates the symbol `var` in the module `M`.
 - A functional programming style is fully supported by the language, including closures, but isn't always the idiomatic solution for Julia. Some [workarounds](../performance-tips/#man-performance-captured) may be necessary for performance when modifying captured variables.
 
-## REPL
+---
+
+## Reference
+
+### REPL
 
 Scope and performance
 One warning about the REPL. The REPL operates at the global scope level of Julia. Usually, when writing longer code, you would put your code inside a function, and organise functions into modules and packages. **_Julia's compiler works much more effectively when your code is organized into functions, and your code will run much faster as a result._** There are also some things that you can't do at the top level.
@@ -7862,7 +7925,11 @@ One warning about the REPL. The REPL operates at the global scope level of Julia
 - JuliaFormatter.jl - Automatic code formatting
 - Lint.jl - Static analysis and style checking
 
-## Testing in Julia
+---
+
+## Development Tools
+
+### Testing in Julia
 
 Julia provides a comprehensive testing framework through the `Test` module, which is part of the standard library. Testing is essential for ensuring code correctness and reliability.
 
@@ -11103,7 +11170,11 @@ using ProfileView
 # 4. Don't optimize what's already fast
 ```
 
-## Makie.jl: Modern Plotting and Visualization
+---
+
+## Visualization
+
+### Makie.jl: Modern Plotting and Visualization
 
 Makie is Julia's most powerful and flexible plotting package, designed for high-performance, interactive, and publication-quality visualizations.
 
