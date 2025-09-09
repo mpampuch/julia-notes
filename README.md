@@ -9736,7 +9736,20 @@ names(SparseArrays)         # List all exported names from SparseArrays
 
 ### PkgTemplates: Creating Julia Packages
 
-Julia packages are best started and cloned from within Julia itself. PkgTemplates provides a standardized way to create new packages with proper structure and CI/CD setup.
+There are **two different approaches** in Julia for creating new packages, `Pkg.generate` and `PkgTemplates.jl`.
+
+`Pkg.generate` comes with Julia’s standard library ()`Pkg`). It just creates a very basic package structure 
+    
+```css
+MyPackage/
+  Project.toml
+  src/
+    MyPackage.jl
+
+But it doesn’t set up tests, CI, license, docs, GitHub integration, etc
+
+
+Julia packages are best started and cloned from within Julia itself with `PkgTemplates`. `PkgTemplates` provides a standardized way to create new packages with proper structure and CI/CD setup.
 
 ```julia
 using PkgTemplates
