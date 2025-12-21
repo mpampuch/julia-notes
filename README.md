@@ -45,6 +45,81 @@ A comprehensive collection of notes, examples, and resources for learning and wo
    - [Help Resources](#help-resources)
    - [Cheatsheet](#cheatsheet)
 
+--- 
+
+Creating a Package in Julia
+
+1. Create a folder
+   ```bash
+   cd FOLDER
+   ```
+
+2. Enter folder with ALDEx2
+   ```bash
+   julia --project=.
+   ```
+
+3. Press `]` to enter `Pkg` mode and type in
+   ```bash
+   pkg> activate .
+   ```
+
+4. Then do
+   ```bash
+   pkg> add PkgTemplates 
+   ```
+
+5. Enter the Julia REPL by pressing `backspace`
+   ```bash
+   julia> using PkgTemplates
+   julia> tpl = Template(plugins=[GitHubActions(), Codecov(), Documenter{GitHubActions}()], user = "mpampuch", dir=pwd())
+   julia> generate("PACKAGE_NAME",tpl)
+   ```
+
+6. This will make a new package inside your folder. Exit the REPL
+   ```bash
+   julia> exit()
+   ```
+
+7. Switch to your new folder
+   ```bash
+   cd PACKAGE_NAME
+   ```
+
+8. Start the REPL again
+   ```
+   ```bash
+   julia --project=.
+
+   # Press `]`
+   pkg> activate .
+   ```
+
+9. Add this to the `Project.toml` file in the Package root directory
+   ```toml
+   [extras]
+   BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+   CompatHelper = "aa819f21-2bde-4658-8897-bab36330d9b7"
+   Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
+   Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+   JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+   PkgTemplates = "14b8a8f1-9102-5b29-a752-f990bacb7fe1"
+   ProfileView = "c46f51b8-102a-5cf2-8d2c-8597cb0e0da7"
+   Registrator = "4418983a-e44d-11e8-3aec-9789530b3b3e"
+   Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+   Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+   
+   [targets]
+   dev = ["Revise", "PkgTemplates", "Registrator", "CompatHelper"]
+   doc = ["Documenter"]
+   test = ["BenchmarkTools", "Cthulhu", "JET", "ProfileView", "Test"]
+   ```
+
+10. Add your package specific dependencies with
+   ```bash
+   pkg> add PACKAGE_NAME
+   ```
+
 ---
 
 ## Getting Started
