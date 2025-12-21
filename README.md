@@ -87,7 +87,6 @@ Creating a Package in Julia
    ```
 
 8. Start the REPL again
-   ```
    ```bash
    julia --project=.
 
