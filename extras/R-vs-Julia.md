@@ -19,17 +19,7 @@
 
 **In short:** the transcript frames the distinction less as **“R vs. Julia”** and more as **“R/Tidyverse's mature high-level data-science experience vs. Julia's performance and flexible language infrastructure.”** Tidier.jl is intended to narrow that gap by giving Julia users a familiar Tidyverse-style interface while retaining Julia underneath.
 
-* * *
-
-**You:**
-
-and the nitty gritty small details of the nature of variables etc
-
-* * *
-
-**ChatGPT:**
-
-Yes. The transcript is mostly about ecosystems and abstractions, but it also contains several **low-level language differences** that are useful for understanding R vs. Julia. Here’s a more “under the hood” comparison, sticking closely to what the transcript actually discusses.
+There are also several **low-level language differences** that are useful for understanding R vs. Julia. Here’s a more “under the hood” comparison, sticking closely to what the transcript actually discusses.
 
 | Detail | R | Julia |
 | --- | --- | --- |
