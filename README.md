@@ -14775,3 +14775,33 @@ function test_io_compatibility()
     end
 end
 ```
+
+## Other
+# function vs. begin vs. let
+
+In our lecture materials, we sometimes use a `let` block in this cell to group multiple expressions together, but how is it different from `begin` or `function`?
+
+## function
+
+Writing functions is a way to group multiple expressions (i.e. lines of code) together into a mini-program. Note the following about functions:
+
+- A function always returns one object.[^1] This object can be given explicitly by writing `return x`, or implicitly: Julia functions always return the result of the last expression by default. So `f(x) = x + 2` is the same as `f(x) = return x + 2`.
+- Variables defined inside a function are not accessible outside the function. We say that function bodies have a **local scope**. This helps to keep your program easy to read and write: if you define a local variable, then you don't need to worry about it in the rest of the notebook.
+
+There are two other ways to group expressions together that you might have seen before: `begin` and `let`.
+
+## begin
+
+`begin` will group expressions together, and it takes the value of its last subexpression.
+
+We use it in this notebook when we want multiple expressions to always run together.
+
+## let
+
+`let` also groups multiple expressions together into one, but variables defined inside of it are **local**: they don't affect code outside of the block.
+
+So, like `begin`, it is just a block of code, but like `function`, it has a local variable scope.
+
+We use it when we want to define some local (temporary) variables to produce a complicated result, without interfering with other cells. Pluto allows only one definition per global variable of the same name, but you can define local variables with the same names whenever you wish!
+
+[^1]: A function call evaluates to one result/object, even if that object itself can contain multiple values (e.g. a tuple).
