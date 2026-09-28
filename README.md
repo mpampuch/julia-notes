@@ -253,6 +253,8 @@ Julia is a high-level, high-performance programming language that combines the e
 
 ![](imgs/Julia-compiling.png)
 
+![](imgs/Julia-compiling-2.png)
+
 ### Julia's Compilation Model: Just-In-Time (JIT) Compilation
 
 ```julia
